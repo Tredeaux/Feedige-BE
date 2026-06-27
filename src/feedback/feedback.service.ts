@@ -13,12 +13,12 @@ import {
 
 const SENTIMENTS = ['positive', 'neutral', 'negative'] as const;
 const PRIORITIES = ['low', 'medium', 'high'] as const;
+const VOLUME_DAYS = 30;
 
-interface LatestAnalysisRow {
-  sentiment: string;
-  priority: string;
-  confidence: number;
-  key_themes: string[];
+interface DistRow {
+  kind: string;
+  key: string;
+  count: number;
 }
 
 @Injectable()
@@ -28,50 +28,73 @@ export class FeedbackService {
     private readonly audit: AuditService,
   ) {}
 
-  /** Aggregate analytics for the dashboard — based on the latest analysis per feedback. */
+  /**
+   * Aggregate analytics for the dashboard. All aggregation runs in Postgres so
+   * the payload stays small regardless of table size:
+   *  - distributions over the *latest* analysis per feedback (DISTINCT ON uses
+   *    the unique (feedback_id, version) index),
+   *  - status grouping (total is derived from these, avoiding a second count),
+   *  - a 30-day volume series filtered on the indexed created_at.
+   */
   async getStats(): Promise<FeedbackStatsDto> {
-    const [total, statusGroups, latest] = await this.prisma.$transaction([
-      this.prisma.feedback.count(),
-      this.prisma.$queryRaw<Array<{ status: string; count: number }>>(
-        Prisma.sql`SELECT status, COUNT(*)::int AS count FROM feedback GROUP BY status`,
-      ),
-      this.prisma.$queryRaw<LatestAnalysisRow[]>(Prisma.sql`
-        SELECT DISTINCT ON (feedback_id)
-          sentiment, priority, confidence::float8 AS confidence, key_themes
-        FROM feedback_analysis
-        ORDER BY feedback_id, version DESC
-      `),
-    ]);
+    const [statusRows, distRows, aggRows, volumeRows] =
+      await this.prisma.$transaction([
+        this.prisma.$queryRaw<Array<{ status: string; count: number }>>(
+          Prisma.sql`SELECT status, COUNT(*)::int AS count FROM feedback GROUP BY status`,
+        ),
+        this.prisma.$queryRaw<DistRow[]>(Prisma.sql`
+          WITH latest AS (
+            SELECT DISTINCT ON (feedback_id) feedback_id, sentiment, priority, key_themes
+            FROM feedback_analysis
+            ORDER BY feedback_id, version DESC
+          )
+          SELECT 'sentiment' AS kind, sentiment AS key, COUNT(*)::int AS count
+            FROM latest GROUP BY sentiment
+          UNION ALL
+          SELECT 'priority', priority, COUNT(*)::int FROM latest GROUP BY priority
+          UNION ALL
+          SELECT 'theme', theme, COUNT(*)::int
+            FROM latest, unnest(key_themes) AS theme GROUP BY theme
+        `),
+        this.prisma.$queryRaw<
+          Array<{ analyzed: number; avg_confidence: number | null }>
+        >(Prisma.sql`
+          SELECT COUNT(*)::int AS analyzed, AVG(confidence)::float8 AS avg_confidence
+          FROM (
+            SELECT DISTINCT ON (feedback_id) confidence
+            FROM feedback_analysis ORDER BY feedback_id, version DESC
+          ) l
+        `),
+        this.prisma.$queryRaw<Array<{ day: string; count: number }>>(Prisma.sql`
+          SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+                 COUNT(*)::int AS count
+          FROM feedback
+          WHERE created_at >= now() - make_interval(days => ${VOLUME_DAYS - 1}::int)
+          GROUP BY 1 ORDER BY 1
+        `),
+      ]);
 
-    const statusCounts = new Map(statusGroups.map((g) => [g.status, g.count]));
+    const statusCounts = new Map(statusRows.map((r) => [r.status, r.count]));
+    const total = statusRows.reduce((sum, r) => sum + r.count, 0);
 
-    const sentimentCounts = countBy(latest, (r) => r.sentiment);
-    const priorityCounts = countBy(latest, (r) => r.priority);
-
-    const themeCounts = new Map<string, number>();
-    for (const row of latest) {
-      for (const theme of row.key_themes) {
-        themeCounts.set(theme, (themeCounts.get(theme) ?? 0) + 1);
-      }
+    const sentimentCounts = new Map<string, number>();
+    const priorityCounts = new Map<string, number>();
+    const themes: Array<{ theme: string; count: number }> = [];
+    for (const row of distRows) {
+      if (row.kind === 'sentiment') sentimentCounts.set(row.key, row.count);
+      else if (row.kind === 'priority') priorityCounts.set(row.key, row.count);
+      else themes.push({ theme: row.key, count: row.count });
     }
-    const topThemes = [...themeCounts.entries()]
-      .map(([theme, count]) => ({ theme, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+    const topThemes = themes.sort((a, b) => b.count - a.count).slice(0, 10);
 
-    const averageConfidence =
-      latest.length > 0
-        ? latest.reduce((sum, r) => sum + r.confidence, 0) / latest.length
-        : null;
+    const analyzed = aggRows[0]?.analyzed ?? 0;
+    const avg = aggRows[0]?.avg_confidence ?? null;
 
     return {
       totalFeedback: total,
-      analyzedFeedback: latest.length,
-      unanalyzedFeedback: total - latest.length,
-      averageConfidence:
-        averageConfidence === null
-          ? null
-          : Math.round(averageConfidence * 100) / 100,
+      analyzedFeedback: analyzed,
+      unanalyzedFeedback: total - analyzed,
+      averageConfidence: avg === null ? null : Math.round(avg * 100) / 100,
       byStatus: FEEDBACK_STATUSES.map((label) => ({
         label,
         count: statusCounts.get(label) ?? 0,
@@ -85,6 +108,7 @@ export class FeedbackService {
         count: priorityCounts.get(label) ?? 0,
       })),
       topThemes,
+      volumeByDay: fillVolumeDays(volumeRows, VOLUME_DAYS),
     };
   }
 
@@ -206,11 +230,19 @@ export class FeedbackService {
   }
 }
 
-function countBy<T>(items: T[], key: (item: T) => string): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    const k = key(item);
-    counts.set(k, (counts.get(k) ?? 0) + 1);
+/** Fill a continuous, gap-free series of the last `days` days (oldest → newest). */
+function fillVolumeDays(
+  rows: Array<{ day: string; count: number }>,
+  days: number,
+): Array<{ date: string; count: number }> {
+  const counts = new Map(rows.map((r) => [r.day, r.count]));
+  const out: Array<{ date: string; count: number }> = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setUTCDate(today.getUTCDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    out.push({ date: key, count: counts.get(key) ?? 0 });
   }
-  return counts;
+  return out;
 }

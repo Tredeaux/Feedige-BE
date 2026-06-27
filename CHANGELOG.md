@@ -32,8 +32,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `GET /api/v1/feedback/stats` — aggregate analytics for the dashboard (triage/admin): totals,
-  analyzed vs backlog, average confidence, and counts by status / sentiment / priority plus top
-  themes, computed from the latest analysis per feedback. e2e covers 401 + shape.
+  analyzed vs backlog, average confidence, counts by status / sentiment / priority, top themes,
+  and a **30-day volume time-series**, computed from the latest analysis per feedback. e2e covers
+  401 + shape.
+
+### Changed
+
+- Stats aggregation now runs **entirely in Postgres** (was pulling every latest-analysis row into
+  Node): SQL `GROUP BY`/aggregates over the latest analysis per feedback (via the unique
+  `(feedback_id, version)` index), total derived from the status groups (no extra `count(*)`),
+  and the volume series filtered on the indexed `created_at`. Result payloads are small and the
+  query cost is bounded regardless of table size.
 - Central `AuditService` and broader audit coverage: auth events (`user_registered`,
   `user_logged_in`, `login_failed`) and `status_changed` are now recorded, alongside the existing
   `feedback_created` and `analysis_created`/`re_analyzed` (cron analyses logged as system runs with

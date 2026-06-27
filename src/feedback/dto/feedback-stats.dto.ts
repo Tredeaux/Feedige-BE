@@ -16,6 +16,14 @@ class ThemeCount {
   count!: number;
 }
 
+class DayCount {
+  @ApiProperty({ example: '2026-06-27' })
+  date!: string;
+
+  @ApiProperty({ example: 5 })
+  count!: number;
+}
+
 export class FeedbackStatsDto {
   @ApiProperty({ example: 137 })
   totalFeedback!: number;
@@ -40,4 +48,10 @@ export class FeedbackStatsDto {
 
   @ApiProperty({ type: [ThemeCount] })
   topThemes!: ThemeCount[];
+
+  @ApiProperty({
+    type: [DayCount],
+    description: 'Feedback volume per day (last 30 days)',
+  })
+  volumeByDay!: DayCount[];
 }
