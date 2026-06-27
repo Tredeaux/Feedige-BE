@@ -98,6 +98,35 @@ HTTP → Controller (@Controller, versioned route, Swagger decorators)
   with `migrate deploy` (CI, production, and automatically on container start via
   `docker-entrypoint.sh`). **Forward-only** — see decisions.md.
 
+## Data model
+
+Four tables model the triage workflow (full schema:
+[`prisma/schema.prisma`](../prisma/schema.prisma); overview table in the README):
+
+```
+users ──1:N──► feedback ──1:N──► feedback_analysis   (versioned AI analyses; unique (feedback_id, version))
+  │               │
+  │               └──1:N──► audit_log                 (append-only action history)
+  └─── submitted_by / analyzed_by / user_id           (nullable user references)
+```
+
+Engineering conventions applied here (rationale in [decisions.md](decisions.md)):
+
+- **UUID PKs** via Postgres `gen_random_uuid()` — the DB generates ids.
+- **Naming:** snake_case columns/tables (`@map`/`@@map`); camelCase Prisma client.
+- **Indexing:** FK columns are explicitly indexed (Postgres does not auto-index
+  them). Also `feedback.status` and `feedback.created_at` for triage listing, and a
+  **unique `(feedback_id, version)`** on `feedback_analysis` to guard re-analysis
+  versions (its leftmost column also serves `feedback_id` lookups).
+- **Referential actions:** deleting a `feedback` **cascades** to its analyses and
+  audit logs; deleting a `user` **sets null** on their references so history/feedback
+  survives.
+- **Flexible status fields:** `status`/`sentiment`/`priority`/`role` are `VARCHAR`,
+  not Postgres enums — new values need no migration. Lifecycle is recoverable
+  through data + the `audit_log`, not schema rollback.
+- **Append-only audit:** `audit_log` records `action` with `old_value`/`new_value`
+  as JSONB for flexible before/after snapshots.
+
 ## The boundary with the frontend
 
 FE (`Feedige-FE`) and BE are **separate repositories** with no shared types

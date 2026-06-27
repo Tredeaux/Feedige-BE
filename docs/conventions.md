@@ -42,8 +42,12 @@ person wrote it. When a rule genuinely shouldn't apply, say why in the PR and in
   `npm run migrate -- --name <change>` in dev, committed under `prisma/migrations/`.
 - **Migrations are forward-only.** To revert, write a new forward migration (Prisma
   is forward-only by design — see decisions.md). Keep the `seed.ts` idempotent.
-- Model lifecycle/state as explicit enums (e.g. `FeedbackStatus`) so state is
-  recoverable through data, not schema rollback.
+- **Schema conventions:** UUID PKs via `gen_random_uuid()`; snake_case DB names via
+  `@map`/`@@map` (camelCase client); **explicitly index every foreign key** (Postgres
+  doesn't auto-index them). State fields (`status`/`sentiment`/`priority`/`role`) are
+  `VARCHAR` for flexibility — recoverability comes from data + the `audit_log`, not
+  schema rollback. Set `onDelete` deliberately (cascade children, set-null nullable
+  user refs). See decisions.md.
 
 ## Routing & versioning
 

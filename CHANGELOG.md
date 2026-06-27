@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Domain schema: `users`, `feedback`, `feedback_analysis` (versioned), and `audit_log` tables
+  in `prisma/schema.prisma`, documented in the README and `docs/`. UUID PKs via
+  `gen_random_uuid()`, snake_case↔camelCase mapping, explicit FK indexes, a unique
+  `(feedback_id, version)`, and `onDelete` cascade/set-null rules.
 - `docs/engineering-standards.md` — senior engineering expectations & review checklist (the bar
   we hold work to). Linked from `AGENTS.md` and the docs index so AI tools self-check against it.
 - `docs/` engineering folder — architecture, conventions, decision log (ADRs), and a
@@ -19,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Added `AGENTS.md`/`CLAUDE.md` pointing to it so AI tools discover it.
 - Comprehensive `README` — tech stack, architecture, API endpoints, data model, migrations,
   and a "Packages reference" section summarising every explicit dependency.
-- Prisma migration workflow: initial committed migration (`prisma/migrations/`), replacing
+- Prisma migration workflow: clean committed `init` migration (`prisma/migrations/`), replacing
   `db push`. Schema changes are now tracked, timestamped, and reproducible.
 - Idempotent database seed (`prisma/seed.ts`, `npm run db:seed`) for fresh-environment setup.
 - Migration scripts: `migrate`, `migrate:deploy`, `migrate:reset`, `migrate:status`.
