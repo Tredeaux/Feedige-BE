@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: feedige
+      POSTGRES_PASSWORD: feedige
+      POSTGRES_DB: feedige
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U feedige -d feedige']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://feedige:feedige@postgres:5432/feedige?schema=public
+      CORS_ORIGIN: http://localhost:3000
+      LOG_LEVEL: info
+    ports:
+      - '3001:3001'
+
+volumes:
+  postgres_data:
