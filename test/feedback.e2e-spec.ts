@@ -67,4 +67,42 @@ describe('Feedback (e2e)', () => {
       })
       .expect(400);
   });
+
+  it('GET /api/v1/feedback requires authentication (401)', () => {
+    return request(app.getHttpServer()).get('/api/v1/feedback').expect(401);
+  });
+
+  it('GET /api/v1/feedback returns a paginated list for a triager', async () => {
+    // Registering grants the triage role.
+    const email = `triager-${Date.now()}@feedige.dev`;
+    let token = '';
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ name: 'Triager', email, password: 'a-strong-password' })
+      .expect(201)
+      .expect((res) => {
+        token = (res.body as { accessToken: string }).accessToken;
+      });
+
+    await request(app.getHttpServer())
+      .get(
+        '/api/v1/feedback?page=1&pageSize=20&sortBy=createdAt&sortOrder=desc',
+      )
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((res) => {
+        const body = res.body as {
+          data: unknown[];
+          page: number;
+          pageSize: number;
+          total: number;
+          totalPages: number;
+        };
+        expect(Array.isArray(body.data)).toBe(true);
+        expect(body.page).toBe(1);
+        expect(body.pageSize).toBe(20);
+        expect(typeof body.total).toBe('number');
+        expect(typeof body.totalPages).toBe('number');
+      });
+  });
 });

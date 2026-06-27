@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `GET /api/v1/feedback` — paginated triage list (triage/admin only via `JwtAuthGuard` +
+  `RolesGuard`). Supports `page`/`pageSize` (default 20, max 100), `status`/`source` filters,
+  `search` (feedback text + submitter), and `sortBy`/`sortOrder`. Returns the latest analysis
+  per item. Unit + e2e tests (401 unauthenticated, 200 paginated for a triager).
 - Global `AllExceptionsFilter` — consistent error shape, Prisma errors mapped (P2002→409,
   P2025→404), and no internal leakage on 5xx.
 - Self-hosted authentication (`auth` module): `POST /api/v1/auth/register`, `POST /api/v1/auth/login`,

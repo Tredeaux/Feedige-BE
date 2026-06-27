@@ -9,25 +9,62 @@ describe('FeedbackService', () => {
     user: { upsert: jest.Mock };
     feedback: { create: jest.Mock };
   };
+  let prisma: {
+    feedback: { count: jest.Mock; findMany: jest.Mock };
+    $transaction: jest.Mock;
+  };
 
   beforeEach(async () => {
     tx = {
       user: { upsert: jest.fn() },
       feedback: { create: jest.fn() },
     };
-    const prismaMock = {
-      // Run the callback with our fake transactional client.
-      $transaction: jest.fn((cb: (client: typeof tx) => unknown) => cb(tx)),
+    prisma = {
+      feedback: { count: jest.fn(), findMany: jest.fn() },
+      // Support both forms: callback (create) and array (list).
+      $transaction: jest.fn((arg: unknown) =>
+        Array.isArray(arg)
+          ? Promise.all(arg)
+          : (arg as (client: typeof tx) => unknown)(tx),
+      ),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         FeedbackService,
-        { provide: PrismaService, useValue: prismaMock },
+        { provide: PrismaService, useValue: prisma },
       ],
     }).compile();
 
     service = moduleRef.get(FeedbackService);
+  });
+
+  it('lists feedback with pagination, search, and sort applied', async () => {
+    prisma.feedback.count.mockResolvedValue(42);
+    prisma.feedback.findMany.mockResolvedValue([]);
+
+    const result = await service.list({
+      page: 2,
+      pageSize: 20,
+      status: 'pending',
+      search: 'export',
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    });
+
+    const findArg = prisma.feedback.findMany.mock.calls[0] as [
+      { skip: number; take: number; orderBy: Record<string, string> },
+    ];
+    expect(findArg[0].skip).toBe(20); // (page-1) * pageSize
+    expect(findArg[0].take).toBe(20);
+    expect(findArg[0].orderBy).toEqual({ createdAt: 'desc' });
+    expect(result).toMatchObject({
+      page: 2,
+      pageSize: 20,
+      total: 42,
+      totalPages: 3,
+      data: [],
+    });
   });
 
   it('upserts the user and creates feedback, returning a mapped response', async () => {
