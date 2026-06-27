@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Prisma migration workflow: initial committed migration (`prisma/migrations/`), replacing
+  `db push`. Schema changes are now tracked, timestamped, and reproducible.
+- Idempotent database seed (`prisma/seed.ts`, `npm run db:seed`) for fresh-environment setup.
+- Migration scripts: `migrate`, `migrate:deploy`, `migrate:reset`, `migrate:status`.
+- `docker-entrypoint.sh`: the API container runs `prisma migrate deploy` on start, so new
+  environments come up fully provisioned.
+- `POSTGRES_PORT` and `API_PORT` env vars to configure the host ports docker-compose publishes
+  Postgres and the API on (avoids clashes with other local services).
 - Initial NestJS + TypeScript scaffold (module/controller/service structure, Jest unit + e2e setup).
 - `@nestjs/config` with Joi environment validation — the app fails fast on missing/invalid config.
 - Global `ValidationPipe` (whitelist + transform) for request payload validation.
@@ -36,7 +44,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   requires driver adapters + a `prisma.config.ts`; v6 was chosen for a stable, well-documented
   NestJS + Prisma setup.
 - Rewrote `src/main.ts` to wire Helmet, CORS, versioning, Swagger, and pino during bootstrap.
+- CI now applies schema via `prisma migrate deploy` instead of `prisma db push`.
+- Moved `prisma` CLI to runtime dependencies so the production image can self-migrate.
+- Docker host Postgres port now defaults to 5432 but is configurable via `POSTGRES_PORT`.
 - Default branch renamed from `master` to `main`.
+
+### Fixed
+
+- `nest build` emitted to `dist/src/main.js` instead of `dist/main.js` after `prisma/seed.ts`
+  was added (it widened TypeScript's inferred `rootDir`), which crashed the Docker container with
+  "Cannot find module '/app/dist/main'". Fixed by excluding `prisma` from `tsconfig.build.json`.
 
 ### Removed
 

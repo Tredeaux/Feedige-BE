@@ -27,12 +27,12 @@ npm install
 # 2. Configure environment
 cp .env.example .env
 
-# 3. Start Postgres (and optionally the API) via Docker
+# 3. Start Postgres via Docker
 docker compose up -d postgres
 
-# 4. Generate the Prisma client and sync the schema
-npm run prisma:generate
-npm run db:push          # or: npm run prisma:migrate  (creates a migration)
+# 4. Apply migrations and seed sample data
+npm run migrate:deploy   # apply committed migrations
+npm run db:seed          # optional: insert sample feedback
 
 # 5. Run the API in watch mode
 npm run start:dev
@@ -46,33 +46,64 @@ The API listens on `http://localhost:3001` by default.
 
 ## Environment variables
 
-| Variable       | Required | Default       | Description                             |
-| -------------- | -------- | ------------- | --------------------------------------- |
-| `NODE_ENV`     | no       | `development` | `development` \| `production` \| `test` |
-| `PORT`         | no       | `3001`        | Port the HTTP server binds to           |
-| `CORS_ORIGIN`  | no       | `*`           | Comma-separated allowed origins, or `*` |
-| `LOG_LEVEL`    | no       | `info`        | pino log level                          |
-| `DATABASE_URL` | **yes**  | —             | Postgres connection string              |
+| Variable        | Required | Default       | Description                                    |
+| --------------- | -------- | ------------- | ---------------------------------------------- |
+| `NODE_ENV`      | no       | `development` | `development` \| `production` \| `test`        |
+| `PORT`          | no       | `3001`        | Port the HTTP server binds to                  |
+| `CORS_ORIGIN`   | no       | `*`           | Comma-separated allowed origins, or `*`        |
+| `LOG_LEVEL`     | no       | `info`        | pino log level                                 |
+| `DATABASE_URL`  | **yes**  | —             | Postgres connection string                     |
+| `POSTGRES_PORT` | no       | `5432`        | Host port docker-compose publishes Postgres on |
 
 Validation lives in [`src/config/env.validation.ts`](src/config/env.validation.ts) — the app refuses to boot on invalid config.
 
+## Database & migrations
+
+Schema changes are managed with **Prisma Migrate** — every change is a committed,
+timestamped migration in [`prisma/migrations/`](prisma/migrations). This keeps environment
+setup reproducible and upgrades deterministic.
+
+```bash
+# Make a schema change in prisma/schema.prisma, then create a migration:
+npm run migrate -- --name <describe_change>   # creates + applies in dev
+
+# Apply pending migrations (CI / production / fresh environments):
+npm run migrate:deploy
+
+# Inspect state / reset a local DB (drops data, re-applies, re-seeds):
+npm run migrate:status
+npm run migrate:reset
+```
+
+**Fresh environment** (clean setup): `migrate deploy` applies all committed migrations from
+scratch — no manual SQL. In Docker this runs automatically on container start (see
+[`docker-entrypoint.sh`](docker-entrypoint.sh)), so a new environment comes up fully provisioned.
+
+**Upgrades** are roll-forward: each change is a new migration applied with `migrate deploy`.
+Downgrades are intentionally **not** supported (Prisma is forward-only by design); to revert,
+write a new forward migration. The `Feedback.status` enum models lifecycle state for the same
+reason — recoverable via data, not schema rollback.
+
 ## Scripts
 
-| Script                   | Description                  |
-| ------------------------ | ---------------------------- |
-| `npm run start:dev`      | Run with hot reload          |
-| `npm run build`          | Compile to `dist/`           |
-| `npm run lint`           | ESLint (auto-fix)            |
-| `npm run typecheck`      | Type-check without emitting  |
-| `npm test`               | Unit tests (Jest)            |
-| `npm run test:e2e`       | End-to-end tests             |
-| `npm run prisma:migrate` | Create/apply a dev migration |
-| `npm run prisma:studio`  | Open Prisma Studio           |
+| Script                   | Description                    |
+| ------------------------ | ------------------------------ |
+| `npm run start:dev`      | Run with hot reload            |
+| `npm run build`          | Compile to `dist/`             |
+| `npm run lint`           | ESLint (auto-fix)              |
+| `npm run typecheck`      | Type-check without emitting    |
+| `npm test`               | Unit tests (Jest)              |
+| `npm run test:e2e`       | End-to-end tests               |
+| `npm run migrate`        | Create/apply a dev migration   |
+| `npm run migrate:deploy` | Apply committed migrations     |
+| `npm run migrate:reset`  | Reset DB (drop, migrate, seed) |
+| `npm run db:seed`        | Seed sample data               |
+| `npm run prisma:studio`  | Open Prisma Studio             |
 
 ## Docker
 
 ```bash
-# Run Postgres + the API together
+# Run Postgres + the API together. The API container applies migrations on start.
 docker compose up --build
 ```
 
@@ -87,4 +118,7 @@ src/
   main.ts          # bootstrap: helmet, cors, versioning, swagger, pino
 prisma/
   schema.prisma    # data model
+  migrations/      # committed, timestamped migrations
+  seed.ts          # idempotent sample-data seed
+docker-entrypoint.sh  # runs `migrate deploy` then starts the app
 ```

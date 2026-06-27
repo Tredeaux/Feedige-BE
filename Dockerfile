@@ -27,6 +27,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY package.json ./
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
 USER node
 EXPOSE 3001
-CMD ["node", "dist/main"]
+# Entrypoint runs `prisma migrate deploy` then launches the app.
+ENTRYPOINT ["./docker-entrypoint.sh"]

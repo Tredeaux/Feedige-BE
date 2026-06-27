@@ -42,8 +42,8 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Sync database schema
-        run: npx prisma db push --skip-generate
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
 
       - name: Lint
         run: npm run lint

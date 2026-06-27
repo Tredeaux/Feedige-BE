@@ -7,7 +7,10 @@ services:
       POSTGRES_PASSWORD: feedige
       POSTGRES_DB: feedige
     ports:
-      - '5432:5432'
+      # Host port defaults to 5432; override POSTGRES_PORT in .env if it clashes
+      # with another local Postgres. The container always listens on 5432
+      # internally (that's what the api service connects to).
+      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,7 +34,8 @@ services:
       CORS_ORIGIN: http://localhost:3000
       LOG_LEVEL: info
     ports:
-      - '3001:3001'
+      # Host port defaults to 3001; override API_PORT in .env if it clashes.
+      - '${API_PORT:-3001}:3001'
 
 volumes:
   postgres_data:
