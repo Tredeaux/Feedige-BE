@@ -4,8 +4,12 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -15,7 +19,9 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { ROLES } from '../auth/roles';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -23,6 +29,7 @@ import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { PaginatedFeedbackDto } from './dto/feedback-list.dto';
 import { FeedbackResponseDto } from './dto/feedback-response.dto';
 import { ListFeedbackQueryDto } from './dto/list-feedback.query.dto';
+import { UpdateFeedbackStatusDto } from './dto/update-status.dto';
 import { FeedbackService } from './feedback.service';
 
 @ApiTags('feedback')
@@ -46,5 +53,20 @@ export class FeedbackController {
   @ApiOkResponse({ type: PaginatedFeedbackDto })
   list(@Query() query: ListFeedbackQueryDto): Promise<PaginatedFeedbackDto> {
     return this.feedbackService.list(query);
+  }
+
+  @Patch(':id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADMIN, ROLES.TRIAGE)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change a feedback item’s triage status' })
+  @ApiOkResponse({ type: FeedbackResponseDto })
+  updateStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateFeedbackStatusDto,
+    @Req() req: Request,
+  ): Promise<FeedbackResponseDto> {
+    const user = req.user as AuthenticatedUser;
+    return this.feedbackService.updateStatus(id, dto.status, user.userId);
   }
 }

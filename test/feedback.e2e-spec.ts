@@ -72,6 +72,50 @@ describe('Feedback (e2e)', () => {
     return request(app.getHttpServer()).get('/api/v1/feedback').expect(401);
   });
 
+  it('PATCH /api/v1/feedback/:id/status requires authentication (401)', () => {
+    return request(app.getHttpServer())
+      .patch('/api/v1/feedback/00000000-0000-0000-0000-000000000000/status')
+      .send({ status: 'reviewed' })
+      .expect(401);
+  });
+
+  it('updates feedback status for a triager', async () => {
+    let token = '';
+    let feedbackId = '';
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        name: 'Status Triager',
+        email: `status-${Date.now()}@feedige.dev`,
+        password: 'a-strong-password',
+      })
+      .expect(201)
+      .expect((res) => {
+        token = (res.body as { accessToken: string }).accessToken;
+      });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/feedback')
+      .send({
+        name: 'Reporter',
+        email: `reporter-${Date.now()}@example.com`,
+        message: 'Status change end-to-end test message.',
+      })
+      .expect(201)
+      .expect((res) => {
+        feedbackId = (res.body as { id: string }).id;
+      });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/feedback/${feedbackId}/status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'reviewed' })
+      .expect(200)
+      .expect((res) => {
+        expect((res.body as { status: string }).status).toBe('reviewed');
+      });
+  });
+
   it('GET /api/v1/feedback returns a paginated list for a triager', async () => {
     // Registering grants the triage role.
     const email = `triager-${Date.now()}@feedige.dev`;

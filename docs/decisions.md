@@ -7,6 +7,28 @@ Format: **Decision → Why → Rejected alternative (when it would win).**
 
 ---
 
+## Audit logging coverage
+
+**Decision:** A central `AuditService.record(entry, client?)` writes the append-only
+`audit_log`; pass a transaction client to record atomically with the action. We log
+the **value-bearing actions**, not everything:
+
+- `feedback_created` (submission), `analysis_created` / `re_analyzed` (manual **and**
+  cron — system runs have `user_id = NULL`), `status_changed` (old→new), and auth
+  events `user_registered` / `user_logged_in` / `login_failed`.
+
+**Why:** A meaningful, queryable trail of who changed what (and what the system did)
+without drowning it in noise. Nullable `user_id`/`feedback_id` let non-feedback and
+system events share one table. Failed logins are recorded as a security signal
+(email only — never the password).
+
+**Rejected:**
+
+- **Log every request** (a global mutation interceptor) — higher coverage but noisy
+  and low-signal; revisit if compliance needs full request provenance.
+- **Audit reads** (GET list/detail) — intentionally not logged; add later only if a
+  sensitive-data-access trail is required.
+
 ## AI analysis via OpenAI (structured, validated)
 
 **Decision:** `POST /api/v1/feedback/:id/analyze` (triage/admin) calls the OpenAI

@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { PaginatedFeedbackDto } from './dto/feedback-list.dto';
@@ -8,7 +9,46 @@ import { ListFeedbackQueryDto } from './dto/list-feedback.query.dto';
 
 @Injectable()
 export class FeedbackService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
+
+  /** Change a feedback item's triage status, recording the change in the audit log. */
+  async updateStatus(
+    id: string,
+    status: string,
+    userId: string,
+  ): Promise<FeedbackResponseDto> {
+    const existing = await this.prisma.feedback.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('Feedback not found.');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const feedback = await tx.feedback.update({
+        where: { id },
+        data: { status },
+        include: { submittedBy: true },
+      });
+      await this.audit.record(
+        {
+          action: 'status_changed',
+          feedbackId: id,
+          userId,
+          oldValue: { status: existing.status },
+          newValue: { status },
+        },
+        tx,
+      );
+      return feedback;
+    });
+
+    return FeedbackResponseDto.fromEntity(updated);
+  }
 
   /** Paginated, filtered, searchable, sortable list for the triage view. */
   async list(query: ListFeedbackQueryDto): Promise<PaginatedFeedbackDto> {

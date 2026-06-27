@@ -2,6 +2,7 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
 
@@ -34,6 +35,7 @@ describe('AuthService', () => {
             signAsync: jest.fn().mockResolvedValue('signed.jwt.token'),
           },
         },
+        { provide: AuditService, useValue: { record: jest.fn() } },
       ],
     }).compile();
 

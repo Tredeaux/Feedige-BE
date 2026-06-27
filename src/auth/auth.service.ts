@@ -6,6 +6,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import type { User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthResponseDto, AuthUserDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
@@ -23,6 +24,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly audit: AuditService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponseDto> {
@@ -54,6 +56,11 @@ export class AuthService {
           },
         });
 
+    await this.audit.record({
+      action: 'user_registered',
+      userId: user.id,
+      newValue: { email: user.email, role: user.role },
+    });
     return this.buildAuthResponse(user);
   }
 
@@ -69,9 +76,15 @@ export class AuthService {
       user?.passwordHash ?? DUMMY_HASH,
     );
     if (!user?.passwordHash || !valid) {
+      await this.audit.record({
+        action: 'login_failed',
+        userId: user?.id ?? null,
+        newValue: { email: dto.email },
+      });
       throw new UnauthorizedException('Invalid email or password.');
     }
 
+    await this.audit.record({ action: 'user_logged_in', userId: user.id });
     return this.buildAuthResponse(user);
   }
 

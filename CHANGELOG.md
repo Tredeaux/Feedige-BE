@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Central `AuditService` and broader audit coverage: auth events (`user_registered`,
+  `user_logged_in`, `login_failed`) and `status_changed` are now recorded, alongside the existing
+  `feedback_created` and `analysis_created`/`re_analyzed` (cron analyses logged as system runs with
+  `user_id = NULL`).
+- `PATCH /api/v1/feedback/:id/status` — change a feedback item's triage status (triage/admin),
+  recorded atomically in the audit log (old→new). e2e covers 401 + the happy path.
 - Backlog screener: a `@nestjs/schedule` cron (`BacklogService`) that auto-analyzes the oldest
   unscreened feedback **one item per minute**, draining the backlog. Re-entrancy guard; no-ops
   when `BACKLOG_ANALYSIS_ENABLED=false` or OpenAI is unconfigured; failed items retry next run.
