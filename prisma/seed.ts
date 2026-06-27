@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 
 /**
  * Idempotent seed for a fresh environment. Safe to run multiple times — it only
- * inserts sample data when the table is empty. Run with `npm run db:seed`
+ * inserts sample data when the database is empty. Run with `npm run db:seed`
  * (also invoked automatically by `prisma migrate reset`).
  */
 async function main(): Promise<void> {
@@ -14,28 +14,83 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Users: one triager and one submitter.
+  const triager = await prisma.user.create({
+    data: { name: 'Alex Triager', email: 'alex@feedige.dev', role: 'admin' },
+  });
+  const submitter = await prisma.user.create({
+    data: { name: 'Sam Customer', email: 'sam@example.com', role: 'triage' },
+  });
+
+  // A reviewed item with an analysis and an audit trail.
+  await prisma.feedback.create({
+    data: {
+      rawText:
+        'CSV export times out on large reports. This blocks my weekly workflow.',
+      source: 'web',
+      status: 'reviewed',
+      submittedById: submitter.id,
+      analyses: {
+        create: {
+          version: 1,
+          sentiment: 'negative',
+          priority: 'high',
+          summary:
+            'Customer is blocked by CSV export timeouts on large reports.',
+          confidence: 0.92,
+          keyThemes: ['export', 'performance', 'reliability'],
+          recommendedActions: [
+            'Investigate CSV export timeout on large datasets',
+            'Add async export with download link',
+          ],
+          analyzedById: triager.id,
+        },
+      },
+      auditLogs: {
+        create: [
+          {
+            userId: triager.id,
+            action: 'analysis_created',
+            newValue: { version: 1, priority: 'high', sentiment: 'negative' },
+          },
+          {
+            userId: triager.id,
+            action: 'status_changed',
+            oldValue: { status: 'pending' },
+            newValue: { status: 'reviewed' },
+          },
+        ],
+      },
+    },
+  });
+
+  // A couple of pending items with no analysis yet.
   await prisma.feedback.createMany({
     data: [
       {
-        title: 'Love the new dashboard',
-        body: 'The redesign is so much faster and easier to navigate. Great work!',
-        status: 'NEW',
+        rawText: 'Love the new dashboard — so much faster to navigate!',
+        source: 'web',
+        status: 'pending',
+        submittedById: submitter.id,
       },
       {
-        title: 'Export keeps failing',
-        body: 'CSV export times out on large reports. This is blocking my weekly workflow.',
-        status: 'TRIAGED',
-      },
-      {
-        title: 'Dark mode please',
-        body: 'Would really appreciate a dark theme for late-night sessions.',
-        status: 'NEW',
+        rawText:
+          'Would really appreciate a dark theme for late-night sessions.',
+        source: 'email',
+        status: 'pending',
       },
     ],
   });
 
-  const total = await prisma.feedback.count();
-  console.log(`Seed complete: ${total} feedback row(s).`);
+  const [users, feedback, analyses, logs] = await Promise.all([
+    prisma.user.count(),
+    prisma.feedback.count(),
+    prisma.feedbackAnalysis.count(),
+    prisma.auditLog.count(),
+  ]);
+  console.log(
+    `Seed complete: ${users} users, ${feedback} feedback, ${analyses} analyses, ${logs} audit log(s).`,
+  );
 }
 
 main()

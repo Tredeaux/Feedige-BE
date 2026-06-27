@@ -8,6 +8,7 @@ and why. **Read it before writing code, and keep it updated as part of "done".**
 - [`docs/conventions.md`](docs/conventions.md) — the rules (modules, DTOs/validation, config, Prisma, errors, logging, versioning, testing)
 - [`docs/decisions.md`](docs/decisions.md) — why we chose what we chose
 - [`docs/adding-a-feature.md`](docs/adding-a-feature.md) — step-by-step playbook for consistent additions
+- [`docs/engineering-standards.md`](docs/engineering-standards.md) — senior expectations & review checklist; self-check changes against it before "done"
 
 Every addition must follow these so the codebase stays consistent.
 

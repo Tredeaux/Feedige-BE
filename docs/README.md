@@ -17,12 +17,13 @@ exists.
 
 ## Contents
 
-| Doc                                        | What's in it                                                                              |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| [architecture.md](architecture.md)         | Module layout, bootstrap pipeline, request lifecycle, data access                         |
-| [conventions.md](conventions.md)           | The rules: modules, DTOs/validation, config, Prisma, errors, logging, versioning, testing |
-| [decisions.md](decisions.md)               | Why we chose what we chose (and the alternatives we rejected)                             |
-| [adding-a-feature.md](adding-a-feature.md) | Step-by-step playbook + checklist for consistent additions                                |
+| Doc                                                  | What's in it                                                                              |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [architecture.md](architecture.md)                   | Module layout, bootstrap pipeline, request lifecycle, data access                         |
+| [conventions.md](conventions.md)                     | The rules: modules, DTOs/validation, config, Prisma, errors, logging, versioning, testing |
+| [decisions.md](decisions.md)                         | Why we chose what we chose (and the alternatives we rejected)                             |
+| [adding-a-feature.md](adding-a-feature.md)           | Step-by-step playbook + checklist for consistent additions                                |
+| [engineering-standards.md](engineering-standards.md) | Senior expectations & review checklist — the bar we hold work to                          |
 
 ## The short version
 

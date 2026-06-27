@@ -84,22 +84,33 @@ Interactive docs: **http://localhost:3001/api/docs**
 
 ## Data model
 
-Managed in [`prisma/schema.prisma`](prisma/schema.prisma):
+Managed in [`prisma/schema.prisma`](prisma/schema.prisma). Four tables model the
+triage workflow:
 
-```prisma
-model Feedback {
-  id        String         @id @default(cuid())
-  title     String
-  body      String
-  status    FeedbackStatus @default(NEW)   // NEW → TRIAGED → IN_PROGRESS → RESOLVED / WONT_FIX
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  @@index([status])
-}
+```
+users ──1:N──► feedback ──1:N──► feedback_analysis      (versioned AI analyses)
+  │                │
+  │                └──1:N──► audit_log                   (append-only history)
+  └──────────────── submitted_by / analyzed_by / user_id (nullable refs)
 ```
 
-The `status` enum models lifecycle state explicitly, so triage progress is
-recoverable through data rather than schema changes.
+| Table               | Purpose                                         | Key columns                                                                                                                                                   |
+| ------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`             | Submitters & triagers                           | `email` (unique), `role` (default `triage`)                                                                                                                   |
+| `feedback`          | Raw feedback awaiting/undergoing triage         | `raw_text`, `source` (default `web`), `status` (default `pending`: `pending`/`reviewed`/`actioned`/`archived`), `submitted_by` → users                        |
+| `feedback_analysis` | AI analysis, **multiple versions per feedback** | `version`, `sentiment`, `priority`, `confidence` (DECIMAL 3,2), `key_themes[]`, `recommended_actions[]`, `model_used`; `feedback_id` → feedback **(cascade)** |
+| `audit_log`         | Append-only action trail                        | `action`, `old_value`/`new_value` (JSONB), `feedback_id` → feedback **(cascade)**, `user_id` → users                                                          |
+
+Design notes (see [`docs/decisions.md`](docs/decisions.md) for full rationale):
+
+- **UUID** primary keys via Postgres `gen_random_uuid()` (database-authoritative).
+- **snake_case** columns in Postgres, **camelCase** in the Prisma client (`@map`/`@@map`).
+- **Foreign keys are explicitly indexed** (Postgres doesn't auto-index them); plus
+  indexes on `feedback.status`/`created_at` and a unique `(feedback_id, version)`.
+- **`onDelete`:** deleting feedback cascades to its analyses and audit logs;
+  deleting a user nulls their references (feedback/analyses/logs are preserved).
+- **Status/sentiment/priority/role are `VARCHAR`** (not enums) for flexibility —
+  adding a value needs no migration.
 
 ---
 

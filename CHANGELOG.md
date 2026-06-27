@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs/engineering-standards.md` — senior engineering expectations & review checklist (the bar
+  we hold work to). Linked from `AGENTS.md` and the docs index so AI tools self-check against it.
 - `docs/` engineering folder — architecture, conventions, decision log (ADRs), and a
   "adding a feature" playbook — as the source of truth for BE design decisions and rules.
   Added `AGENTS.md`/`CLAUDE.md` pointing to it so AI tools discover it.
