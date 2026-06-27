@@ -54,6 +54,7 @@ The API listens on `http://localhost:3001` by default.
 | `LOG_LEVEL`     | no       | `info`        | pino log level                                 |
 | `DATABASE_URL`  | **yes**  | —             | Postgres connection string                     |
 | `POSTGRES_PORT` | no       | `5432`        | Host port docker-compose publishes Postgres on |
+| `API_PORT`      | no       | `3001`        | Host port docker-compose publishes the API on  |
 
 Validation lives in [`src/config/env.validation.ts`](src/config/env.validation.ts) — the app refuses to boot on invalid config.
 
