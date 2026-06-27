@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `GET /api/v1/feedback/stats` — aggregate analytics for the dashboard (triage/admin): totals,
+  analyzed vs backlog, average confidence, and counts by status / sentiment / priority plus top
+  themes, computed from the latest analysis per feedback. e2e covers 401 + shape.
 - Central `AuditService` and broader audit coverage: auth events (`user_registered`,
   `user_logged_in`, `login_failed`) and `status_changed` are now recorded, alongside the existing
   `feedback_created` and `analysis_created`/`re_analyzed` (cron analyses logged as system runs with

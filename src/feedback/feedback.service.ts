@@ -3,9 +3,23 @@ import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
+import { FeedbackStatsDto } from './dto/feedback-stats.dto';
 import { PaginatedFeedbackDto } from './dto/feedback-list.dto';
 import { FeedbackResponseDto } from './dto/feedback-response.dto';
-import { ListFeedbackQueryDto } from './dto/list-feedback.query.dto';
+import {
+  FEEDBACK_STATUSES,
+  ListFeedbackQueryDto,
+} from './dto/list-feedback.query.dto';
+
+const SENTIMENTS = ['positive', 'neutral', 'negative'] as const;
+const PRIORITIES = ['low', 'medium', 'high'] as const;
+
+interface LatestAnalysisRow {
+  sentiment: string;
+  priority: string;
+  confidence: number;
+  key_themes: string[];
+}
 
 @Injectable()
 export class FeedbackService {
@@ -13,6 +27,66 @@ export class FeedbackService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {}
+
+  /** Aggregate analytics for the dashboard — based on the latest analysis per feedback. */
+  async getStats(): Promise<FeedbackStatsDto> {
+    const [total, statusGroups, latest] = await this.prisma.$transaction([
+      this.prisma.feedback.count(),
+      this.prisma.$queryRaw<Array<{ status: string; count: number }>>(
+        Prisma.sql`SELECT status, COUNT(*)::int AS count FROM feedback GROUP BY status`,
+      ),
+      this.prisma.$queryRaw<LatestAnalysisRow[]>(Prisma.sql`
+        SELECT DISTINCT ON (feedback_id)
+          sentiment, priority, confidence::float8 AS confidence, key_themes
+        FROM feedback_analysis
+        ORDER BY feedback_id, version DESC
+      `),
+    ]);
+
+    const statusCounts = new Map(statusGroups.map((g) => [g.status, g.count]));
+
+    const sentimentCounts = countBy(latest, (r) => r.sentiment);
+    const priorityCounts = countBy(latest, (r) => r.priority);
+
+    const themeCounts = new Map<string, number>();
+    for (const row of latest) {
+      for (const theme of row.key_themes) {
+        themeCounts.set(theme, (themeCounts.get(theme) ?? 0) + 1);
+      }
+    }
+    const topThemes = [...themeCounts.entries()]
+      .map(([theme, count]) => ({ theme, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const averageConfidence =
+      latest.length > 0
+        ? latest.reduce((sum, r) => sum + r.confidence, 0) / latest.length
+        : null;
+
+    return {
+      totalFeedback: total,
+      analyzedFeedback: latest.length,
+      unanalyzedFeedback: total - latest.length,
+      averageConfidence:
+        averageConfidence === null
+          ? null
+          : Math.round(averageConfidence * 100) / 100,
+      byStatus: FEEDBACK_STATUSES.map((label) => ({
+        label,
+        count: statusCounts.get(label) ?? 0,
+      })),
+      bySentiment: SENTIMENTS.map((label) => ({
+        label,
+        count: sentimentCounts.get(label) ?? 0,
+      })),
+      byPriority: PRIORITIES.map((label) => ({
+        label,
+        count: priorityCounts.get(label) ?? 0,
+      })),
+      topThemes,
+    };
+  }
 
   /** Change a feedback item's triage status, recording the change in the audit log. */
   async updateStatus(
@@ -130,4 +204,13 @@ export class FeedbackService {
 
     return FeedbackResponseDto.fromEntity(feedback);
   }
+}
+
+function countBy<T>(items: T[], key: (item: T) => string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const k = key(item);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return counts;
 }

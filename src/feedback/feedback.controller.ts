@@ -28,6 +28,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { PaginatedFeedbackDto } from './dto/feedback-list.dto';
 import { FeedbackResponseDto } from './dto/feedback-response.dto';
+import { FeedbackStatsDto } from './dto/feedback-stats.dto';
 import { ListFeedbackQueryDto } from './dto/list-feedback.query.dto';
 import { UpdateFeedbackStatusDto } from './dto/update-status.dto';
 import { FeedbackService } from './feedback.service';
@@ -43,6 +44,16 @@ export class FeedbackController {
   @ApiCreatedResponse({ type: FeedbackResponseDto })
   create(@Body() dto: CreateFeedbackDto): Promise<FeedbackResponseDto> {
     return this.feedbackService.create(dto);
+  }
+
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADMIN, ROLES.TRIAGE)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Aggregate analytics for the dashboard' })
+  @ApiOkResponse({ type: FeedbackStatsDto })
+  stats(): Promise<FeedbackStatsDto> {
+    return this.feedbackService.getStats();
   }
 
   @Get()

@@ -72,6 +72,46 @@ describe('Feedback (e2e)', () => {
     return request(app.getHttpServer()).get('/api/v1/feedback').expect(401);
   });
 
+  it('GET /api/v1/feedback/stats requires authentication (401)', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/feedback/stats')
+      .expect(401);
+  });
+
+  it('GET /api/v1/feedback/stats returns aggregate analytics for a triager', async () => {
+    let token = '';
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        name: 'Stats Triager',
+        email: `stats-${Date.now()}@feedige.dev`,
+        password: 'a-strong-password',
+      })
+      .expect(201)
+      .expect((res) => {
+        token = (res.body as { accessToken: string }).accessToken;
+      });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/feedback/stats')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((res) => {
+        const body = res.body as {
+          totalFeedback: number;
+          byStatus: unknown[];
+          bySentiment: unknown[];
+          byPriority: unknown[];
+          topThemes: unknown[];
+        };
+        expect(typeof body.totalFeedback).toBe('number');
+        expect(Array.isArray(body.byStatus)).toBe(true);
+        expect(Array.isArray(body.bySentiment)).toBe(true);
+        expect(Array.isArray(body.byPriority)).toBe(true);
+        expect(Array.isArray(body.topThemes)).toBe(true);
+      });
+  });
+
   it('PATCH /api/v1/feedback/:id/status requires authentication (401)', () => {
     return request(app.getHttpServer())
       .patch('/api/v1/feedback/00000000-0000-0000-0000-000000000000/status')

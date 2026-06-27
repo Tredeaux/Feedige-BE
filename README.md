@@ -70,6 +70,7 @@ All routes are under the `/api` prefix; feature routes are URI-versioned (`/api/
 | `GET`   | `/api/v1/auth/me`              | Current user (requires Bearer token)                        | ✅ Available |
 | `POST`  | `/api/v1/feedback`             | Submit feedback (upsert user + persist)                     | ✅ Available |
 | `GET`   | `/api/v1/feedback`             | List feedback — triage/admin; paginated, filter/search/sort | ✅ Available |
+| `GET`   | `/api/v1/feedback/stats`       | Aggregate analytics for the dashboard (triage/admin)        | ✅ Available |
 | `POST`  | `/api/v1/feedback/:id/analyze` | Run AI analysis on a feedback item (triage/admin)           | ✅ Available |
 | `PATCH` | `/api/v1/feedback/:id/status`  | Change triage status (triage/admin; audited)                | ✅ Available |
 
