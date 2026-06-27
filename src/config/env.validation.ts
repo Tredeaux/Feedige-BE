@@ -20,4 +20,8 @@ export const validationSchema = Joi.object({
   // Secret used to sign JWTs. Required — keep it long and random in real envs.
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('1d'),
+  // AI analysis (OpenAI). Optional so the app boots without it; the analyze
+  // endpoint returns 503 until a key is configured.
+  OPENAI_API_KEY: Joi.string().allow('').optional(),
+  OPENAI_MODEL: Joi.string().default('gpt-4o-mini'),
 });

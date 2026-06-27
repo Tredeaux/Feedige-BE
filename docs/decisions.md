@@ -7,6 +7,38 @@ Format: **Decision → Why → Rejected alternative (when it would win).**
 
 ---
 
+## AI analysis via OpenAI (structured, validated)
+
+**Decision:** `POST /api/v1/feedback/:id/analyze` (triage/admin) calls the OpenAI
+Chat Completions API with **Structured Outputs** (a strict JSON schema) to produce
+`sentiment`/`priority`/`summary`/`confidence`/`keyThemes`/`recommendedActions`,
+validates the response with **Joi** before persisting a new `feedback_analysis`
+**version** (+ an audit-log entry). Prompt + output contract are versioned in code
+(`analysis.constants.ts`, `ANALYSIS_PROMPT_VERSION`). Model defaults to
+`gpt-4o-mini` (`OPENAI_MODEL`).
+
+**Why (maps to the engineering standards' AI items):**
+
+- **Structured output + validation:** schema-constrained generation _and_ a Joi
+  re-check — we never trust raw model output (malformed JSON → 422).
+- **Prompt-injection:** feedback is passed as the _user_ message and the system
+  prompt explicitly says to treat it as untrusted data, not instructions.
+- **Reliability:** the OpenAI client uses built-in retries (2) + a 30s timeout;
+  failures surface as 503, not a crash.
+- **Cost/latency:** `gpt-4o-mini` + `temperature 0.2`; one call per analyze.
+- **Optionality:** `OPENAI_API_KEY` is optional — the client provider yields `null`
+  and the endpoint returns 503 when unset, so the app still boots (and CI passes)
+  without a key.
+
+**Rejected:**
+
+- **Auto-analyze on submit** — would put a slow, paid, failable LLM call in the
+  user's submit path; instead it's an explicit triage action. Revisit with a
+  **background worker/queue** when volume warrants (persist-first is already in
+  place, so the move is incremental).
+- **Default to Llama/other** — the schema's `model_used` default mentioned Llama,
+  but the product choice here is OpenAI; `model_used` records whatever actually ran.
+
 ## Security hardening: authorization, rate limiting, error handling
 
 Follow-ups from the senior audit:

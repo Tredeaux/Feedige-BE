@@ -61,15 +61,16 @@ AppModule
 
 All routes are under the `/api` prefix; feature routes are URI-versioned (`/api/v1/...`).
 
-| Method | Path                    | Description                                                 | Status       |
-| ------ | ----------------------- | ----------------------------------------------------------- | ------------ |
-| `GET`  | `/api/health`           | Liveness check incl. database ping                          | ✅ Available |
-| `GET`  | `/api/docs`             | Swagger / OpenAPI UI                                        | ✅ Available |
-| `POST` | `/api/v1/auth/register` | Create an account, returns a JWT                            | ✅ Available |
-| `POST` | `/api/v1/auth/login`    | Sign in, returns a JWT                                      | ✅ Available |
-| `GET`  | `/api/v1/auth/me`       | Current user (requires Bearer token)                        | ✅ Available |
-| `POST` | `/api/v1/feedback`      | Submit feedback (upsert user + persist)                     | ✅ Available |
-| `GET`  | `/api/v1/feedback`      | List feedback — triage/admin; paginated, filter/search/sort | ✅ Available |
+| Method | Path                           | Description                                                 | Status       |
+| ------ | ------------------------------ | ----------------------------------------------------------- | ------------ |
+| `GET`  | `/api/health`                  | Liveness check incl. database ping                          | ✅ Available |
+| `GET`  | `/api/docs`                    | Swagger / OpenAPI UI                                        | ✅ Available |
+| `POST` | `/api/v1/auth/register`        | Create an account, returns a JWT                            | ✅ Available |
+| `POST` | `/api/v1/auth/login`           | Sign in, returns a JWT                                      | ✅ Available |
+| `GET`  | `/api/v1/auth/me`              | Current user (requires Bearer token)                        | ✅ Available |
+| `POST` | `/api/v1/feedback`             | Submit feedback (upsert user + persist)                     | ✅ Available |
+| `GET`  | `/api/v1/feedback`             | List feedback — triage/admin; paginated, filter/search/sort | ✅ Available |
+| `POST` | `/api/v1/feedback/:id/analyze` | Run AI analysis on a feedback item (triage/admin)           | ✅ Available |
 
 Authentication is self-hosted: passwords are hashed with **bcrypt**, and protected
 routes require a **JWT** bearer token (`Authorization: Bearer <token>`). Self-registration

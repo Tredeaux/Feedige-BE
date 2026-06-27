@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI analysis (`analysis` module): `POST /api/v1/feedback/:id/analyze` (triage/admin) runs the
+  OpenAI Chat Completions API with **Structured Outputs**, Joi-validates the result, and persists a
+  new versioned `feedback_analysis` row (+ audit entry). Prompt-injection guard, retries + 30s
+  timeout, optional `OPENAI_API_KEY` (503 when unset), `OPENAI_MODEL` (default `gpt-4o-mini`).
+  Unit tests (success, 503 unconfigured, 422 invalid output) + e2e (401 guard).
 - `GET /api/v1/feedback` — paginated triage list (triage/admin only via `JwtAuthGuard` +
   `RolesGuard`). Supports `page`/`pageSize` (default 20, max 100), `status`/`source` filters,
   `search` (feedback text + submitter), and `sortBy`/`sortOrder`. Returns the latest analysis
