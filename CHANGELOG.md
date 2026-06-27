@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `POST /api/v1/feedback` endpoint (`feedback` module: controller + service + DTOs). Validated
+  with `class-validator` + Swagger; persists atomically in a transaction — upserts the submitting
+  user by email, creates the feedback, and writes a `feedback_created` audit-log entry. Unit +
+  e2e tests cover the happy path, validation rejection, and whitelist enforcement.
+- `applyGlobalConfig()` (`src/app.config.ts`) — shared `/api` prefix, URI versioning, and the
+  global `ValidationPipe`, used by both `main.ts` and the e2e tests so tests exercise the real
+  request pipeline.
 - Domain schema: `users`, `feedback`, `feedback_analysis` (versioned), and `audit_log` tables
   in `prisma/schema.prisma`, documented in the README and `docs/`. UUID PKs via
   `gen_random_uuid()`, snake_case↔camelCase mapping, explicit FK indexes, a unique

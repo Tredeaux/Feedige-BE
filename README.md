@@ -61,12 +61,12 @@ AppModule
 
 All routes are under the `/api` prefix; feature routes are URI-versioned (`/api/v1/...`).
 
-| Method | Path               | Description                        | Status       |
-| ------ | ------------------ | ---------------------------------- | ------------ |
-| `GET`  | `/api/health`      | Liveness check incl. database ping | ✅ Available |
-| `GET`  | `/api/docs`        | Swagger / OpenAPI UI               | ✅ Available |
-| `POST` | `/api/v1/feedback` | Submit feedback (ingest + analyse) | 🚧 Planned   |
-| `GET`  | `/api/v1/feedback` | List feedback with analysis        | 🚧 Planned   |
+| Method | Path               | Description                             | Status       |
+| ------ | ------------------ | --------------------------------------- | ------------ |
+| `GET`  | `/api/health`      | Liveness check incl. database ping      | ✅ Available |
+| `GET`  | `/api/docs`        | Swagger / OpenAPI UI                    | ✅ Available |
+| `POST` | `/api/v1/feedback` | Submit feedback (upsert user + persist) | ✅ Available |
+| `GET`  | `/api/v1/feedback` | List feedback with analysis             | 🚧 Planned   |
 
 **Health response**
 

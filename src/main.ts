@@ -1,9 +1,9 @@
-import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
+import { applyGlobalConfig } from './app.config';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
@@ -26,19 +26,8 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
-  // Routing: all endpoints under /api, URI-versioned (default v1).
-  app.setGlobalPrefix('api');
-  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-
-  // Validate and transform all incoming payloads.
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+  // Routing (/api prefix, URI versioning) + global ValidationPipe.
+  applyGlobalConfig(app);
 
   // Flush Prisma connections etc. on SIGTERM/SIGINT.
   app.enableShutdownHooks();

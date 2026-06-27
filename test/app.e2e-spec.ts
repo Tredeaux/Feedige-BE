@@ -1,7 +1,8 @@
-import { INestApplication, VersioningType } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { applyGlobalConfig } from './../src/app.config';
 import { AppModule } from './../src/app.module';
 
 describe('App (e2e)', () => {
@@ -13,8 +14,7 @@ describe('App (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+    applyGlobalConfig(app);
     await app.init();
   });
 
