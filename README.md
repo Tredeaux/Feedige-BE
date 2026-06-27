@@ -1,24 +1,111 @@
 # Feedige — Backend
 
-NestJS + TypeScript API for Feedige.
+The API for **Feedige**, an AI-powered feedback triage app. It ingests product
+feedback, persists it to Postgres, and (planned) runs AI analysis to surface
+sentiment, themes, priority, and recommended actions. Consumed by the
+[frontend](https://github.com/Tredeaux/Feedige-FE).
 
-## Stack
+---
 
-- **Framework:** [NestJS 11](https://nestjs.com/) (Express)
-- **Language:** TypeScript
-- **Database:** PostgreSQL via [Prisma](https://www.prisma.io/)
-- **Validation:** `class-validator` + global `ValidationPipe`, env validated with Joi
-- **Docs:** OpenAPI/Swagger at `/api/docs`
-- **Logging:** structured JSON via [nestjs-pino](https://github.com/iamolegga/nestjs-pino)
-- **Security:** Helmet, configurable CORS
-- **Health:** Terminus health check at `/api/health` (includes DB ping)
+## Tech stack
 
-## Requirements
+| Concern    | Choice                                                                      |
+| ---------- | --------------------------------------------------------------------------- |
+| Framework  | [NestJS 11](https://nestjs.com/) (Express)                                  |
+| Language   | TypeScript                                                                  |
+| Database   | PostgreSQL via [Prisma 6](https://www.prisma.io/) (Migrate)                 |
+| Validation | `class-validator` + global `ValidationPipe`; env via Joi                    |
+| API docs   | OpenAPI / Swagger (`@nestjs/swagger`)                                       |
+| Logging    | Structured JSON via [nestjs-pino](https://github.com/iamolegga/nestjs-pino) |
+| Security   | Helmet, configurable CORS                                                   |
+| Health     | `@nestjs/terminus` (liveness + DB ping)                                     |
+| Quality    | ESLint + Prettier · Husky + lint-staged · CI (GitHub Actions)               |
 
-- Node.js `>=22` (see [`.nvmrc`](.nvmrc))
-- Docker (for local Postgres)
+---
+
+## Architecture
+
+A standard NestJS modular layout. Cross-cutting concerns (config, logging,
+database) are global; features are self-contained modules. The bootstrap wires
+the request pipeline once in `main.ts`.
+
+```
+main.ts                      Bootstrap pipeline:
+  ├─ helmet()                  security headers
+  ├─ CORS                      configurable allow-list
+  ├─ /api prefix + URI v1      versioned routing
+  ├─ ValidationPipe            whitelist + transform DTOs
+  ├─ pino logger               structured request logs
+  ├─ Swagger  → /api/docs      OpenAPI UI
+  └─ shutdown hooks            clean Prisma disconnect
+
+AppModule
+  ├─ ConfigModule (global)     Joi-validated env, fail-fast
+  ├─ LoggerModule (pino)       global structured logging
+  ├─ PrismaModule (global)     PrismaService — DB access
+  └─ HealthModule              GET /api/health (+ Prisma indicator)
+```
+
+**Key modules**
+
+| Path                           | Responsibility                                        |
+| ------------------------------ | ----------------------------------------------------- |
+| `src/config/env.validation.ts` | Joi schema; the app refuses to boot on invalid config |
+| `src/prisma/`                  | Global `PrismaService` (connect/disconnect lifecycle) |
+| `src/health/`                  | Terminus health check + custom Prisma DB indicator    |
+| `src/main.ts`                  | Bootstrap: security, versioning, Swagger, logging     |
+
+---
+
+## API endpoints
+
+All routes are under the `/api` prefix; feature routes are URI-versioned (`/api/v1/...`).
+
+| Method | Path               | Description                        | Status       |
+| ------ | ------------------ | ---------------------------------- | ------------ |
+| `GET`  | `/api/health`      | Liveness check incl. database ping | ✅ Available |
+| `GET`  | `/api/docs`        | Swagger / OpenAPI UI               | ✅ Available |
+| `POST` | `/api/v1/feedback` | Submit feedback (ingest + analyse) | 🚧 Planned   |
+| `GET`  | `/api/v1/feedback` | List feedback with analysis        | 🚧 Planned   |
+
+**Health response**
+
+```json
+{
+  "status": "ok",
+  "info": { "database": { "status": "up" } },
+  "details": { "database": { "status": "up" } }
+}
+```
+
+Interactive docs: **http://localhost:3001/api/docs**
+
+---
+
+## Data model
+
+Managed in [`prisma/schema.prisma`](prisma/schema.prisma):
+
+```prisma
+model Feedback {
+  id        String         @id @default(cuid())
+  title     String
+  body      String
+  status    FeedbackStatus @default(NEW)   // NEW → TRIAGED → IN_PROGRESS → RESOLVED / WONT_FIX
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  @@index([status])
+}
+```
+
+The `status` enum models lifecycle state explicitly, so triage progress is
+recoverable through data rather than schema changes.
+
+---
 
 ## Getting started
+
+**Prerequisites:** Node.js `>=22` (see [`.nvmrc`](.nvmrc)) and Docker (for local Postgres).
 
 ```bash
 # 1. Install dependencies
@@ -27,22 +114,23 @@ npm install
 # 2. Configure environment
 cp .env.example .env
 
-# 3. Start Postgres via Docker
+# 3. Start Postgres
 docker compose up -d postgres
 
-# 4. Apply migrations and seed sample data
-npm run migrate:deploy   # apply committed migrations
-npm run db:seed          # optional: insert sample feedback
+# 4. Apply migrations and (optionally) seed sample data
+npm run migrate:deploy
+npm run db:seed
 
 # 5. Run the API in watch mode
 npm run start:dev
 ```
 
-The API listens on `http://localhost:3001` by default.
+The API listens on **http://localhost:3001** by default.
 
-- Health check: `GET http://localhost:3001/api/health`
-- API docs: `http://localhost:3001/api/docs`
-- Endpoints are versioned: `http://localhost:3001/api/v1/...`
+> **Port already in use?** Override at launch, e.g. `PORT=3011 npm run start:dev`,
+> and set `POSTGRES_PORT` if `5432` is taken.
+
+---
 
 ## Environment variables
 
@@ -54,36 +142,37 @@ The API listens on `http://localhost:3001` by default.
 | `LOG_LEVEL`     | no       | `info`        | pino log level                                 |
 | `DATABASE_URL`  | **yes**  | —             | Postgres connection string                     |
 | `POSTGRES_PORT` | no       | `5432`        | Host port docker-compose publishes Postgres on |
-| `API_PORT`      | no       | `3001`        | Host port docker-compose publishes the API on  |
 
-Validation lives in [`src/config/env.validation.ts`](src/config/env.validation.ts) — the app refuses to boot on invalid config.
+Validated in [`src/config/env.validation.ts`](src/config/env.validation.ts) — invalid config fails fast at boot.
+
+---
 
 ## Database & migrations
 
 Schema changes are managed with **Prisma Migrate** — every change is a committed,
-timestamped migration in [`prisma/migrations/`](prisma/migrations). This keeps environment
-setup reproducible and upgrades deterministic.
+timestamped migration in [`prisma/migrations/`](prisma/migrations), so
+environment setup is reproducible and upgrades are deterministic.
 
 ```bash
-# Make a schema change in prisma/schema.prisma, then create a migration:
-npm run migrate -- --name <describe_change>   # creates + applies in dev
+# Edit prisma/schema.prisma, then create a migration (dev):
+npm run migrate -- --name <describe_change>
 
-# Apply pending migrations (CI / production / fresh environments):
+# Apply pending migrations (CI / production / fresh env):
 npm run migrate:deploy
 
-# Inspect state / reset a local DB (drops data, re-applies, re-seeds):
+# Inspect / reset (reset drops data, re-applies, re-seeds):
 npm run migrate:status
 npm run migrate:reset
 ```
 
-**Fresh environment** (clean setup): `migrate deploy` applies all committed migrations from
-scratch — no manual SQL. In Docker this runs automatically on container start (see
-[`docker-entrypoint.sh`](docker-entrypoint.sh)), so a new environment comes up fully provisioned.
+- **Fresh environment:** `migrate deploy` applies every committed migration from
+  scratch — no manual SQL. In Docker this runs automatically on container start
+  (see [`docker-entrypoint.sh`](docker-entrypoint.sh)).
+- **Upgrades are roll-forward:** each change is a new migration. Downgrades are
+  intentionally not supported (Prisma is forward-only by design); to revert,
+  write a new forward migration.
 
-**Upgrades** are roll-forward: each change is a new migration applied with `migrate deploy`.
-Downgrades are intentionally **not** supported (Prisma is forward-only by design); to revert,
-write a new forward migration. The `Feedback.status` enum models lifecycle state for the same
-reason — recoverable via data, not schema rollback.
+---
 
 ## Scripts
 
@@ -101,25 +190,92 @@ reason — recoverable via data, not schema rollback.
 | `npm run db:seed`        | Seed sample data               |
 | `npm run prisma:studio`  | Open Prisma Studio             |
 
+---
+
 ## Docker
 
 ```bash
-# Run Postgres + the API together. The API container applies migrations on start.
+# Run Postgres + the API together (API auto-migrates on start)
 docker compose up --build
 ```
+
+---
 
 ## Project structure
 
 ```
 src/
-  config/          # env validation
-  health/          # /api/health (Terminus + Prisma ping)
-  prisma/          # PrismaService + global PrismaModule
-  app.module.ts    # root module wiring
-  main.ts          # bootstrap: helmet, cors, versioning, swagger, pino
+  config/          env validation (Joi)
+  health/          GET /api/health (Terminus + Prisma ping)
+  prisma/          PrismaService + global PrismaModule
+  app.module.ts    root module wiring
+  main.ts          bootstrap: helmet, cors, versioning, swagger, pino
 prisma/
-  schema.prisma    # data model
-  migrations/      # committed, timestamped migrations
-  seed.ts          # idempotent sample-data seed
-docker-entrypoint.sh  # runs `migrate deploy` then starts the app
+  schema.prisma    data model
+  migrations/      committed migration history
+  seed.ts          idempotent sample-data seed
 ```
+
+---
+
+## Packages reference
+
+Short notes on every package we explicitly depend on, for future reference.
+
+### Framework & runtime
+
+| Package                    | What it does                                                            |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `@nestjs/common`           | Core NestJS building blocks — decorators, pipes, guards, DI primitives. |
+| `@nestjs/core`             | The framework runtime (module system, request lifecycle).               |
+| `@nestjs/platform-express` | Express HTTP adapter under NestJS.                                      |
+| `@nestjs/config`           | Loads and exposes configuration/env, with validation hooks.             |
+| `reflect-metadata`         | Enables the decorator metadata NestJS DI relies on.                     |
+| `rxjs`                     | Reactive streams — NestJS's foundation for interceptors/observables.    |
+
+### Database
+
+| Package          | What it does                                                                     |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `prisma`         | CLI + migration engine. Kept as a runtime dep so the container can self-migrate. |
+| `@prisma/client` | The generated, fully-typed database client used in services.                     |
+
+### Validation & config
+
+| Package             | What it does                                                                           |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `joi`               | Schema validation for **environment variables** — the app won't boot on bad config.    |
+| `class-validator`   | Decorator-based validation of incoming request DTOs (via the global `ValidationPipe`). |
+| `class-transformer` | Converts plain request payloads into typed class instances (DTO transform).            |
+
+### API, security & ops
+
+| Package            | What it does                                                           |
+| ------------------ | ---------------------------------------------------------------------- |
+| `@nestjs/swagger`  | Generates the OpenAPI spec + Swagger UI at `/api/docs`.                |
+| `helmet`           | Sets security-related HTTP response headers.                           |
+| `@nestjs/terminus` | Health-check framework powering `GET /api/health` (incl. the DB ping). |
+
+### Logging
+
+| Package       | What it does                                                              |
+| ------------- | ------------------------------------------------------------------------- |
+| `nestjs-pino` | Wires the pino logger into NestJS as the app logger + request logging.    |
+| `pino-http`   | The HTTP request/response logging layer pino-nestjs builds on.            |
+| `pino-pretty` | Human-readable pretty log output in development (raw JSON in production). |
+
+### Tooling
+
+| Package                                             | What it does                                          |
+| --------------------------------------------------- | ----------------------------------------------------- |
+| `typescript`                                        | The language + type checker.                          |
+| `@nestjs/cli` / `@nestjs/schematics`                | Build, run, and scaffold NestJS code.                 |
+| `@nestjs/testing`                                   | Utilities to bootstrap modules in tests.              |
+| `jest` / `ts-jest`                                  | Unit-test runner + TypeScript transform.              |
+| `supertest`                                         | HTTP assertions for e2e tests.                        |
+| `ts-node` / `ts-loader` / `tsconfig-paths`          | Run TS directly / webpack TS / path-alias resolution. |
+| `source-map-support`                                | Maps runtime stack traces back to TypeScript source.  |
+| `eslint` / `typescript-eslint`                      | Linting (with TS awareness).                          |
+| `eslint-config-prettier` / `eslint-plugin-prettier` | Make ESLint and Prettier cooperate.                   |
+| `prettier`                                          | Code formatter.                                       |
+| `husky` / `lint-staged`                             | Git hooks; lint/format only staged files pre-commit.  |

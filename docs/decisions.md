@@ -1,0 +1,154 @@
+# Decision Log (ADRs)
+
+Lightweight record of notable technical decisions: what we chose, why, and the
+alternative we rejected. Append new entries at the top. Keep them short.
+
+Format: **Decision → Why → Rejected alternative (when it would win).**
+
+---
+
+## Self-migrating container
+
+**Decision:** The API container runs `prisma migrate deploy` on startup via
+`docker-entrypoint.sh` before launching the app; the `prisma` CLI is a runtime
+dependency (not dev-only) so it's present in the production image.
+
+**Why:** A fresh environment comes up fully provisioned with no manual step —
+"clean setup" is just `docker compose up`.
+
+**Rejected:** Running migrations as a separate CI/CD step or one-off job. That's
+better at scale (multiple replicas shouldn't race to migrate) — if we move to
+horizontal scaling, switch to a dedicated migration job and drop the entrypoint
+migrate. For now, simplicity wins.
+
+---
+
+## Forward-only migrations (no downgrade)
+
+**Decision:** Use Prisma Migrate with committed, timestamped migrations; no
+down/rollback migrations. To revert, write a new forward migration.
+
+**Why:** Prisma is forward-only by design and roll-forward is a safer production
+posture for data than scripted downgrades. Explicit product decision.
+
+**Rejected:** Paired up/down scripts via `prisma migrate diff`, or a separate
+up/down tool (node-pg-migrate). Reconsider only if a hard requirement for
+symmetric downgrades appears.
+
+---
+
+## Pinned Prisma to v6 (not v7)
+
+**Decision:** Pin `prisma` and `@prisma/client` to `^6`.
+
+**Why:** npm installs Prisma 7 by default, which **drops `url` from the schema** and
+requires driver adapters + a `prisma.config.ts` — added complexity the NestJS
+ecosystem hasn't standardized on. v6 is stable and well-documented for NestJS.
+
+**Rejected:** Prisma 7 with driver adapters. Revisit when the driver-adapter
+pattern is mainstream; the upgrade will need `prisma.config.ts` and a `@prisma/adapter-pg`
+setup. (Note: `package.json#prisma` seed config is also deprecated in 7 — move it to
+`prisma.config.ts` at that time.)
+
+---
+
+## NestJS as the framework
+
+**Decision:** NestJS 11 on Express, with DI, modules, and decorators.
+
+**Why:** Opinionated structure (modules/controllers/services) keeps a growing API
+consistent; first-class DI, validation, Swagger, and testing support.
+
+**Rejected:** Express/Fastify alone (less structure, more boilerplate for DI,
+validation, docs). Choose minimal frameworks for tiny services; Feedige expects to
+grow.
+
+---
+
+## Global ValidationPipe + class-validator DTOs
+
+**Decision:** A global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`,
+`transform`) with class-validator DTOs.
+
+**Why:** Every endpoint validates and transforms input consistently with zero
+per-handler code; unknown properties are rejected.
+
+**Rejected:** Per-route manual validation or Zod pipes. Zod is great (and used on
+the FE), but class-validator is Nest-idiomatic and integrates with Swagger; mixing
+both here would be inconsistent.
+
+---
+
+## Joi-validated env, fail-fast
+
+**Decision:** Validate env with Joi in `ConfigModule.forRoot`; the app refuses to
+boot on invalid config. Read via `ConfigService`.
+
+**Why:** Catch misconfiguration at startup, not deep in a request. Typed access.
+
+**Rejected:** Reading `process.env` ad hoc (untyped, fails late and silently).
+
+---
+
+## /api prefix + URI versioning
+
+**Decision:** Global `/api` prefix and URI versioning (`/api/v1/...`); operational
+routes (health) are version-neutral.
+
+**Why:** Clean separation of API surface; versioning lets the contract evolve
+without breaking existing clients.
+
+**Rejected:** Header/media-type versioning (less obvious to consumers); no
+versioning (painful to evolve a contract consumed by a separate FE repo).
+
+---
+
+## Structured logging with nestjs-pino
+
+**Decision:** `nestjs-pino` as the app logger; automatic request logging; redact
+sensitive headers.
+
+**Why:** Fast, JSON, production-grade logs that aggregators can parse; one logger
+across the app.
+
+**Rejected:** Nest's default logger (not structured/JSON, weaker for production).
+
+---
+
+## Terminus health check
+
+**Decision:** `@nestjs/terminus` at `/api/health` with a custom Prisma DB-ping
+indicator.
+
+**Why:** Standard, extensible health contract for orchestrators/uptime checks that
+verifies real dependencies (the DB), not just process liveness.
+
+**Rejected:** A hand-rolled `{status:"ok"}` endpoint (doesn't prove the DB is
+reachable).
+
+---
+
+## Configurable host ports (POSTGRES_PORT, API_PORT)
+
+**Decision:** docker-compose publishes Postgres and the API on `${POSTGRES_PORT:-5432}`
+and `${API_PORT:-3001}`.
+
+**Why:** Defaults stay conventional for clean environments, but developers with
+those ports already in use can override in `.env` without editing committed files.
+
+**Rejected:** Hardcoded ports (collide with other local services).
+
+---
+
+## Separate frontend and backend repositories
+
+**Decision:** FE (`Feedige-FE`) and BE are separate repos. The API contract is
+expressed by DTOs + the Swagger spec and **hand-synced** with the FE's `src/lib/`
+schemas.
+
+**Why:** Explicit product choice for independent deploy/ownership.
+
+**Trade-off / how to proceed:** Shapes can drift across repos. Keep DTOs aligned
+with the FE on every change. If drift becomes painful, generate a typed FE client
+from this service's OpenAPI/Swagger spec (preferred — it already exists) or publish
+a shared types package.

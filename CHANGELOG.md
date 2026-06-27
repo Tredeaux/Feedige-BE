@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs/` engineering folder — architecture, conventions, decision log (ADRs), and a
+  "adding a feature" playbook — as the source of truth for BE design decisions and rules.
+  Added `AGENTS.md`/`CLAUDE.md` pointing to it so AI tools discover it.
+- Comprehensive `README` — tech stack, architecture, API endpoints, data model, migrations,
+  and a "Packages reference" section summarising every explicit dependency.
 - Prisma migration workflow: initial committed migration (`prisma/migrations/`), replacing
   `db push`. Schema changes are now tracked, timestamped, and reproducible.
 - Idempotent database seed (`prisma/seed.ts`, `npm run db:seed`) for fresh-environment setup.
