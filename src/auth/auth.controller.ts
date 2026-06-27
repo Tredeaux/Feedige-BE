@@ -15,6 +15,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { AuthResponseDto, AuthUserDto } from './dto/auth-response.dto';
@@ -28,7 +29,9 @@ import type { AuthenticatedUser } from './jwt.strategy';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Tight limits on auth endpoints to blunt brute-force / abuse.
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create an account and return a JWT' })
   @ApiCreatedResponse({ type: AuthResponseDto })
@@ -37,6 +40,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sign in and return a JWT' })
   @ApiOkResponse({ type: AuthResponseDto })

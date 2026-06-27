@@ -11,8 +11,12 @@ import { AuthResponseDto, AuthUserDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import type { JwtPayload } from './jwt.strategy';
+import { ROLES } from './roles';
 
 const BCRYPT_ROUNDS = 12;
+// A throwaway hash compared against when no user is found, so login takes the
+// same time whether or not the email exists (prevents timing-based enumeration).
+const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', BCRYPT_ROUNDS);
 
 @Injectable()
 export class AuthService {
@@ -33,13 +37,20 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    // Self-registration never grants privileged access; triage/admin is granted
+    // out-of-band (seeded admin / future promotion endpoint).
     const user = existing
       ? await this.prisma.user.update({
           where: { id: existing.id },
           data: { name: dto.name, passwordHash },
         })
       : await this.prisma.user.create({
-          data: { name: dto.name, email: dto.email, passwordHash },
+          data: {
+            name: dto.name,
+            email: dto.email,
+            passwordHash,
+            role: ROLES.MEMBER,
+          },
         });
 
     return this.buildAuthResponse(user);
@@ -49,12 +60,14 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
-    if (!user?.passwordHash) {
-      throw new UnauthorizedException('Invalid email or password.');
-    }
 
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) {
+    // Always run a bcrypt comparison (against a dummy hash when the user is
+    // missing) so response timing doesn't reveal whether the email exists.
+    const valid = await bcrypt.compare(
+      dto.password,
+      user?.passwordHash ?? DUMMY_HASH,
+    );
+    if (!user?.passwordHash || !valid) {
       throw new UnauthorizedException('Invalid email or password.');
     }
 

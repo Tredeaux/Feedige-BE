@@ -33,9 +33,24 @@ services:
       DATABASE_URL: postgresql://feedige:feedige@postgres:5432/feedige?schema=public
       CORS_ORIGIN: http://localhost:3000
       LOG_LEVEL: info
+      # Override with a long random secret in any real environment.
+      JWT_SECRET: ${JWT_SECRET:-local-compose-secret-change-me}
+      JWT_EXPIRES_IN: 1d
     ports:
       # Host port defaults to 3001; override API_PORT in .env if it clashes.
       - '${API_PORT:-3001}:3001'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:3001/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 volumes:
   postgres_data:

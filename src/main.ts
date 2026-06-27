@@ -19,11 +19,13 @@ async function bootstrap(): Promise<void> {
   // Security headers.
   app.use(helmet());
 
-  // CORS — reflect any origin when "*", otherwise an explicit allow-list.
+  // CORS — explicit allow-list in real environments (set CORS_ORIGIN). "*"
+  // reflects any origin and is intended for local dev only. Credentials are not
+  // enabled because auth uses Bearer tokens, not cookies — so "*" here does not
+  // expose credentialed cross-origin requests.
   app.enableCors({
     origin:
       corsOrigin === '*' ? true : corsOrigin.split(',').map((o) => o.trim()),
-    credentials: true,
   });
 
   // Routing (/api prefix, URI versioning) + global ValidationPipe.

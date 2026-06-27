@@ -10,8 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Authorization: self-registration now creates the least-privileged `member` role (was `triage`);
+  `users.role` default changed via migration. Added `RolesGuard` + `@Roles()` for protecting admin
+  endpoints, and a seeded admin (`admin@feedige.dev` / `admin12345`, dev only).
+- Rate limiting via `@nestjs/throttler`: 100/min global baseline, 5/min on `/auth/register` and
+  `/auth/login`.
+- CORS no longer sends `credentials` (auth is Bearer-based), so a `*` origin can't enable
+  credentialed cross-origin requests.
+- Login runs a constant-time bcrypt comparison (dummy hash when the user is absent) to prevent
+  timing-based account enumeration.
+- Anonymous feedback submissions no longer overwrite an existing user's name.
+
 ### Added
 
+- Global `AllExceptionsFilter` — consistent error shape, Prisma errors mapped (P2002→409,
+  P2025→404), and no internal leakage on 5xx.
 - Self-hosted authentication (`auth` module): `POST /api/v1/auth/register`, `POST /api/v1/auth/login`,
   and a guarded `GET /api/v1/auth/me`. Passwords hashed with bcrypt; JWTs issued via `@nestjs/jwt`
   and verified with `passport-jwt` (`JwtAuthGuard`). Added a nullable `password_hash` column to

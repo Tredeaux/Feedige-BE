@@ -7,6 +7,34 @@ Format: **Decision → Why → Rejected alternative (when it would win).**
 
 ---
 
+## Security hardening: authorization, rate limiting, error handling
+
+Follow-ups from the senior audit:
+
+- **Authorization (roles):** Self-registration now creates the least-privileged
+  role (`member`) — the `users.role` default was changed from `triage` to `member`
+  (migration). Triage/admin is granted out-of-band (a seeded admin; a future
+  admin-only promotion endpoint). A `RolesGuard` + `@Roles()` decorator
+  (`src/auth/`) are the mechanism for protecting admin endpoints; the frontend
+  also gates the panel on `role ∈ {admin, triage}`. **Why:** previously anyone who
+  registered got triage access. **Rejected:** open self-service triage access
+  (only acceptable for a fully public tool).
+- **Rate limiting:** In-app via `@nestjs/throttler` — a global 100/min baseline and
+  a tight 5/min on `/auth/register` + `/auth/login`. **Why:** blunt brute-force and
+  abuse with a portable, per-route limit. **Trade-off:** the in-memory store is
+  per-instance; back it with **Redis** for multi-replica, and add **edge/gateway**
+  rate limiting (Cloudflare/nginx) as the primary volumetric layer in production.
+- **CORS:** dropped `credentials: true` (auth is Bearer, not cookies) so a `*`
+  origin can't enable credentialed cross-origin requests; set an explicit
+  `CORS_ORIGIN` allow-list in real environments.
+- **Centralized errors:** a global `AllExceptionsFilter` normalizes the error shape,
+  maps Prisma errors (P2002→409, P2025→404), and never leaks internals on 5xx.
+- **Login timing:** login always runs a bcrypt compare (against a dummy hash when
+  the user is absent) to avoid timing-based account enumeration.
+- **Identity:** anonymous feedback submissions no longer overwrite an existing
+  user's name (find-or-create, no update). **Remaining hardening:** email
+  verification before a feedback-only account can be "claimed" via registration.
+
 ## Self-hosted JWT authentication
 
 **Decision:** Roll our own auth (no external provider): passwords hashed with

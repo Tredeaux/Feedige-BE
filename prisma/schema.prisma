@@ -24,7 +24,9 @@ model User {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name         String?  @db.VarChar(100)
   email        String   @unique @db.VarChar(255)
-  role         String   @default("triage") @db.VarChar(50)
+  // Default is the least-privileged role; triage/admin must be granted explicitly
+  // (seeded admin, or a future admin-only promotion endpoint).
+  role         String   @default("member") @db.VarChar(50)
   // Set only for accounts that can sign in (admin/triage). Null for users who
   // were created implicitly by submitting feedback.
   passwordHash String?  @map("password_hash") @db.VarChar(255)

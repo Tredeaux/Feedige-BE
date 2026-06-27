@@ -1,6 +1,11 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+// Dev-only admin credentials. Change these in any real environment.
+const ADMIN_EMAIL = 'admin@feedige.dev';
+const ADMIN_PASSWORD = 'admin12345';
 
 /**
  * Idempotent seed for a fresh environment. Safe to run multiple times — it only
@@ -14,12 +19,18 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Users: one triager and one submitter.
+  // A real admin that can sign in to the panel (role 'admin' + password).
   const triager = await prisma.user.create({
-    data: { name: 'Alex Triager', email: 'alex@feedige.dev', role: 'admin' },
+    data: {
+      name: 'Alex Admin',
+      email: ADMIN_EMAIL,
+      role: 'admin',
+      passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 12),
+    },
   });
+  // A plain submitter (no password, least-privileged role).
   const submitter = await prisma.user.create({
-    data: { name: 'Sam Customer', email: 'sam@example.com', role: 'triage' },
+    data: { name: 'Sam Customer', email: 'sam@example.com', role: 'member' },
   });
 
   // A reviewed item with an analysis and an audit trail.
@@ -91,6 +102,7 @@ async function main(): Promise<void> {
   console.log(
     `Seed complete: ${users} users, ${feedback} feedback, ${analyses} analyses, ${logs} audit log(s).`,
   );
+  console.log(`Admin login → ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
 }
 
 main()

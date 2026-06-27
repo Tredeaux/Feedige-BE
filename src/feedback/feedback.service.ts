@@ -16,9 +16,12 @@ export class FeedbackService {
     const source = dto.source ?? 'web';
 
     const feedback = await this.prisma.$transaction(async (tx) => {
+      // Find-or-create by email. We do NOT overwrite an existing user's name —
+      // an anonymous submission must not be able to change a registered user's
+      // identity. The name is only set when the user is first created.
       const user = await tx.user.upsert({
         where: { email: dto.email },
-        update: { name: dto.name },
+        update: {},
         create: { email: dto.email, name: dto.name },
       });
 

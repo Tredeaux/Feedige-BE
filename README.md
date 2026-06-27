@@ -72,8 +72,13 @@ All routes are under the `/api` prefix; feature routes are URI-versioned (`/api/
 | `GET`  | `/api/v1/feedback`      | List feedback with analysis             | 🚧 Planned   |
 
 Authentication is self-hosted: passwords are hashed with **bcrypt**, and protected
-routes require a **JWT** bearer token (`Authorization: Bearer <token>`). See
-[`docs/decisions.md`](docs/decisions.md#self-hosted-jwt-authentication).
+routes require a **JWT** bearer token (`Authorization: Bearer <token>`). Self-registration
+grants the least-privileged role (`member`); triage/admin access is granted out-of-band
+(the seeded admin, or a future promotion endpoint). Auth endpoints are **rate-limited**
+(5/min). See [`docs/decisions.md`](docs/decisions.md#security-hardening-authorization-rate-limiting-error-handling).
+
+After seeding, sign in to the admin panel with **`admin@feedige.dev` / `admin12345`**
+(dev only — change for real environments).
 
 **Health response**
 
