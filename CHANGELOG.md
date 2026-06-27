@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Backlog screener: a `@nestjs/schedule` cron (`BacklogService`) that auto-analyzes the oldest
+  unscreened feedback **one item per minute**, draining the backlog. Re-entrancy guard; no-ops
+  when `BACKLOG_ANALYSIS_ENABLED=false` or OpenAI is unconfigured; failed items retry next run.
+  Unit tests cover the enabled/empty/disabled/unconfigured paths.
 - AI analysis (`analysis` module): `POST /api/v1/feedback/:id/analyze` (triage/admin) runs the
   OpenAI Chat Completions API with **Structured Outputs**, Joi-validates the result, and persists a
   new versioned `feedback_analysis` row (+ audit entry). Prompt-injection guard, retries + 30s

@@ -24,4 +24,7 @@ export const validationSchema = Joi.object({
   // endpoint returns 503 until a key is configured.
   OPENAI_API_KEY: Joi.string().allow('').optional(),
   OPENAI_MODEL: Joi.string().default('gpt-4o-mini'),
+  // Background backlog screener: auto-analyzes unanalyzed feedback one item per
+  // minute. No-ops unless OPENAI_API_KEY is also set.
+  BACKLOG_ANALYSIS_ENABLED: Joi.boolean().default(true),
 });

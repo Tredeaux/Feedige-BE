@@ -30,12 +30,21 @@ validates the response with **Joi** before persisting a new `feedback_analysis`
   and the endpoint returns 503 when unset, so the app still boots (and CI passes)
   without a key.
 
+**Backlog screener (cron):** a `@nestjs/schedule` job (`BacklogService`) runs every
+minute and analyzes **one** unscreened item — the oldest feedback with no analysis.
+A successful run creates an analysis row, which drops the item from the
+`analyses: none` query, so the queue drains one-per-minute. It no-ops when disabled
+(`BACKLOG_ANALYSIS_ENABLED=false`) or when OpenAI isn't configured, uses a re-entrancy
+guard, and logs+continues on failure (failed items retry next tick). One-per-minute
+also gently caps API cost. **Single-instance only** — for multiple replicas, move it
+to a dedicated worker or add a distributed lock.
+
 **Rejected:**
 
 - **Auto-analyze on submit** — would put a slow, paid, failable LLM call in the
-  user's submit path; instead it's an explicit triage action. Revisit with a
-  **background worker/queue** when volume warrants (persist-first is already in
-  place, so the move is incremental).
+  user's submit path; instead it's an explicit triage action plus the background
+  screener. Revisit with a **queue** (BullMQ/Redis) when volume warrants
+  (persist-first is already in place, so the move is incremental).
 - **Default to Llama/other** — the schema's `model_used` default mentioned Llama,
   but the product choice here is OpenAI; `model_used` records whatever actually ran.
 

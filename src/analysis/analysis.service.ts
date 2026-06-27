@@ -47,10 +47,13 @@ export class AnalysisService {
     private readonly prisma: PrismaService,
   ) {}
 
-  /** Run AI analysis on a feedback item and persist a new analysis version. */
+  /**
+   * Run AI analysis on a feedback item and persist a new analysis version.
+   * `analyzedById` is null for system/automated runs (the backlog screener).
+   */
   async analyzeFeedback(
     feedbackId: string,
-    analyzedById: string,
+    analyzedById: string | null,
   ): Promise<AnalysisResponseDto> {
     const feedback = await this.prisma.feedback.findUnique({
       where: { id: feedbackId },

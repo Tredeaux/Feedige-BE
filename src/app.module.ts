@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AnalysisModule } from './analysis/analysis.module';
@@ -32,6 +33,7 @@ import { PrismaModule } from './prisma/prisma.module';
     // @Throttle (see AuthController). In-memory store — fine for a single
     // instance; back with Redis for multi-replica deployments.
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    ScheduleModule.forRoot(),
     PrismaModule,
     HealthModule,
     AuthModule,
