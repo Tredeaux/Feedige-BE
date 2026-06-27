@@ -37,19 +37,20 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
-    // Self-registration never grants privileged access; triage/admin is granted
-    // out-of-band (seeded admin / future promotion endpoint).
+    // Product decision: registering grants triage access (open/collaborative
+    // triage). Feedback-only users that never register stay `member`. `admin` is
+    // still granted out-of-band (seed / future promotion endpoint).
     const user = existing
       ? await this.prisma.user.update({
           where: { id: existing.id },
-          data: { name: dto.name, passwordHash },
+          data: { name: dto.name, passwordHash, role: ROLES.TRIAGE },
         })
       : await this.prisma.user.create({
           data: {
             name: dto.name,
             email: dto.email,
             passwordHash,
-            role: ROLES.MEMBER,
+            role: ROLES.TRIAGE,
           },
         });
 

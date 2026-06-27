@@ -11,14 +11,16 @@ Format: **Decision → Why → Rejected alternative (when it would win).**
 
 Follow-ups from the senior audit:
 
-- **Authorization (roles):** Self-registration now creates the least-privileged
-  role (`member`) — the `users.role` default was changed from `triage` to `member`
-  (migration). Triage/admin is granted out-of-band (a seeded admin; a future
-  admin-only promotion endpoint). A `RolesGuard` + `@Roles()` decorator
-  (`src/auth/`) are the mechanism for protecting admin endpoints; the frontend
-  also gates the panel on `role ∈ {admin, triage}`. **Why:** previously anyone who
-  registered got triage access. **Rejected:** open self-service triage access
-  (only acceptable for a fully public tool).
+- **Authorization (roles):** The `users.role` default is `member` (migration), so
+  feedback-only users created implicitly by a submission are least-privileged. A
+  `RolesGuard` + `@Roles()` decorator (`src/auth/`) protect admin/triage endpoints,
+  and the frontend gates the panel on `role ∈ {admin, triage}`. **Product decision
+  (updated):** **self-registration grants the `triage` role** — Feedige is an open/
+  collaborative triage tool, so anyone who signs up can triage. `admin` is still
+  granted out-of-band (seed / future promotion endpoint). **Trade-off:** there is no
+  approval step on triage access; if the tool ever needs vetted triagers, switch
+  registration back to `member` and add an admin-only promotion flow (the guard/role
+  model already supports it).
 - **Rate limiting:** In-app via `@nestjs/throttler` — a global 100/min baseline and
   a tight 5/min on `/auth/register` + `/auth/login`. **Why:** blunt brute-force and
   abuse with a portable, per-route limit. **Trade-off:** the in-memory store is

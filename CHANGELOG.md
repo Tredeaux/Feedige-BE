@@ -10,11 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Self-registration grants the `triage` role (open/collaborative triage) — registered users can
+  access the panel. Feedback-only users (created implicitly by a submission) remain `member`.
+  `admin` is still granted out-of-band.
+
 ### Security
 
-- Authorization: self-registration now creates the least-privileged `member` role (was `triage`);
-  `users.role` default changed via migration. Added `RolesGuard` + `@Roles()` for protecting admin
-  endpoints, and a seeded admin (`admin@feedige.dev` / `admin12345`, dev only).
+- Authorization: `users.role` default is `member` (migration) for feedback-only users. Added
+  `RolesGuard` + `@Roles()` for protecting admin/triage endpoints, and a seeded admin
+  (`admin@feedige.dev` / `admin12345`, dev only). The frontend gates the panel on role.
 - Rate limiting via `@nestjs/throttler`: 100/min global baseline, 5/min on `/auth/register` and
   `/auth/login`.
 - CORS no longer sends `credentials` (auth is Bearer-based), so a `*` origin can't enable
