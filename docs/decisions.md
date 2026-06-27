@@ -7,6 +7,27 @@ Format: **Decision → Why → Rejected alternative (when it would win).**
 
 ---
 
+## Self-hosted JWT authentication
+
+**Decision:** Roll our own auth (no external provider): passwords hashed with
+**bcryptjs**, **JWT** issued on register/login (`@nestjs/jwt` + `passport-jwt`),
+protected routes guarded by `JwtAuthGuard`. The token is returned to the client
+and sent as `Authorization: Bearer <token>`. A `password_hash` column was added to
+`users` (nullable — feedback-only users have none and can later "claim" the account
+by registering).
+
+**Why:** The requirement was explicitly "no external auth, clean and simple". Bearer
+tokens are the simplest contract across the separate FE/BE origins.
+
+**Trade-off / hardening:** The FE stores the token in `localStorage`, which is
+readable by XSS. For production, move to an **httpOnly, Secure, SameSite cookie**
+(needs HTTPS + CORS `credentials`), add refresh tokens/rotation, rate-limit
+`/auth/*`, and consider `argon2` over bcrypt. `bcryptjs` (pure JS) was chosen over
+native `bcrypt`/`argon2` to avoid native builds in the Alpine Docker image.
+
+**Rejected:** External auth (Clerk/Auth0) — explicitly out of scope; httpOnly
+cookies now — more setup than "simple" warrants in local dev across two origins.
+
 ## Domain schema: users / feedback / feedback_analysis / audit_log
 
 **Decision:** Model the triage domain as four tables with these senior choices:

@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Self-hosted authentication (`auth` module): `POST /api/v1/auth/register`, `POST /api/v1/auth/login`,
+  and a guarded `GET /api/v1/auth/me`. Passwords hashed with bcrypt; JWTs issued via `@nestjs/jwt`
+  and verified with `passport-jwt` (`JwtAuthGuard`). Added a nullable `password_hash` column to
+  `users` (migration) and `JWT_SECRET`/`JWT_EXPIRES_IN` env vars. Unit + e2e tests cover
+  register/login/me, duplicate (409), bad credentials (401), and unauthenticated access (401).
 - `POST /api/v1/feedback` endpoint (`feedback` module: controller + service + DTOs). Validated
   with `class-validator` + Swagger; persists atomically in a transaction — upserts the submitting
   user by email, creates the feedback, and writes a `feedback_created` audit-log entry. Unit +

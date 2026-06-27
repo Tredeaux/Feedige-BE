@@ -27,6 +27,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://feedige:feedige@localhost:5432/feedige_test?schema=public
+      JWT_SECRET: ci-test-secret-not-used-in-production
 
     steps:
       - uses: actions/checkout@v4

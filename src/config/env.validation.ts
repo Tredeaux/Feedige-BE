@@ -17,4 +17,7 @@ export const validationSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .valid('fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent')
     .default('info'),
+  // Secret used to sign JWTs. Required — keep it long and random in real envs.
+  JWT_SECRET: Joi.string().min(16).required(),
+  JWT_EXPIRES_IN: Joi.string().default('1d'),
 });
