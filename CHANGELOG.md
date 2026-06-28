@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Job monitoring**: a `JobRun` table (committed migration) records every backlog-screener run
+  (success / noop / failed) with timestamps, duration, items processed, and errors. New
+  admin/triage endpoints `GET /api/v1/jobs` (live summary: health, schedule, next run via
+  `SchedulerRegistry`, totals) and `GET /api/v1/jobs/:name/runs` (paginated history).
+- **Audit log API**: `GET /api/v1/audit-logs` (paginated, filterable by action / actor / feedback /
+  date / search) and `GET /api/v1/audit-logs/actions` (distinct actions for filtering).
+- Unit tests for `JobsService` health/totals computation.
+
 ### Changed
 
 - Self-registration grants the `triage` role (open/collaborative triage) — registered users can

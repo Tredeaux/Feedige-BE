@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaginatedAuditDto } from './dto/audit-log.dto';
+import { ListAuditQueryDto } from './dto/list-audit.query.dto';
 
 export interface AuditEntry {
   action: string;
@@ -36,5 +38,61 @@ export class AuditService {
         notes: entry.notes,
       },
     });
+  }
+
+  /** Paginated, filtered, searchable view of the audit log (newest first). */
+  async list(query: ListAuditQueryDto): Promise<PaginatedAuditDto> {
+    const { page, pageSize, action, userId, feedbackId, search, from, to } =
+      query;
+
+    const where: Prisma.AuditLogWhereInput = {
+      ...(action ? { action } : {}),
+      ...(userId ? { userId } : {}),
+      ...(feedbackId ? { feedbackId } : {}),
+      ...(from || to
+        ? {
+            createdAt: {
+              ...(from ? { gte: new Date(from) } : {}),
+              ...(to ? { lte: new Date(to) } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { action: { contains: search, mode: 'insensitive' } },
+              { notes: { contains: search, mode: 'insensitive' } },
+              { user: { email: { contains: search, mode: 'insensitive' } } },
+              { user: { name: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.auditLog.count({ where }),
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          user: true,
+          feedback: { select: { id: true, rawText: true } },
+        },
+      }),
+    ]);
+
+    return PaginatedAuditDto.from(rows, { page, pageSize, total });
+  }
+
+  /** Distinct action names, for populating a filter dropdown. */
+  async distinctActions(): Promise<string[]> {
+    const rows = await this.prisma.auditLog.findMany({
+      distinct: ['action'],
+      select: { action: true },
+      orderBy: { action: 'asc' },
+    });
+    return rows.map((r) => r.action);
   }
 }

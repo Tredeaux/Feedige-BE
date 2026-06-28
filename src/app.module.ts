@@ -11,6 +11,7 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { validationSchema } from './config/env.validation';
 import { FeedbackModule } from './feedback/feedback.module';
 import { HealthModule } from './health/health.module';
+import { JobsModule } from './jobs/jobs.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -41,6 +42,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     FeedbackModule,
     AnalysisModule,
+    JobsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

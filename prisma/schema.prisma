@@ -105,3 +105,22 @@ model AuditLog {
   @@index([userId]) // FK lookups
   @@map("audit_log")
 }
+
+/// Execution record for scheduled background jobs — powers the cron monitor.
+/// One row per actual run (success / noop / failed); disabled/idle ticks are not
+/// recorded (the live summary reports those states instead).
+model JobRun {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobName        String    @map("job_name") @db.VarChar(100)
+  status         String    @db.VarChar(20) // success, noop, failed
+  startedAt      DateTime  @map("started_at") @db.Timestamptz(6)
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(6)
+  durationMs     Int?      @map("duration_ms")
+  itemsProcessed Int       @default(0) @map("items_processed")
+  detail         String?   @db.Text
+  error          String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([jobName, startedAt(sort: Desc)]) // recent runs for a job, newest first
+  @@map("job_run")
+}
