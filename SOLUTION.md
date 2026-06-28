@@ -286,16 +286,18 @@ spine these build on.
   SQS) and a horizontally-scaled worker pool** — throughput then scales with
   workers instead of one-item-per-minute, and submit stays instant.
 - **Backpressure against provider limits:** a token-bucket rate limiter, bounded
-  worker concurrency, exponential backoff + jitter on 429/5xx, and a
-  dead-letter queue for poison items.
+  worker concurrency, exponential backoff + jitter on 429/5xx (jitter so retries
+  don't resynchronise into a thundering herd), and a dead-letter queue for poison
+  items.
 - **Cost & latency:** cache/deduplicate analyses of near-identical text; use a
   cheaper model for first-pass triage and escalate only borderline items; track
   per-request token cost as a first-class metric.
 
 **Data layer.**
 
-- **Connection pooling** (PgBouncer) — Prisma across many instances exhausts
-  Postgres connections quickly.
+- **Connection pooling** (PgBouncer) — Postgres caps out at a few hundred
+  connections, and every stateless API replica holds its own Prisma pool, so they
+  exhaust the server fast; PgBouncer multiplexes many clients onto a small pool.
 - **Read/write split:** the dashboard and list endpoints are read-heavy; route
   them to **read replicas**, keep writes on primary.
 - **Retention / partitioning** for the append-only high-volume tables
@@ -311,8 +313,10 @@ spine these build on.
 - Move **rate limiting to a shared Redis store** so limits hold across instances
   (the code already flags the in-memory store as single-instance).
 - Replace the cron's in-memory re-entrancy guard with a **distributed lock /
-  `SELECT … FOR UPDATE SKIP LOCKED`** — or drop the cron entirely in favour of the
-  queue above.
+  `SELECT … FOR UPDATE SKIP LOCKED`** — the latter atomically claims a row _and_
+  skips ones already taken, so N workers pull disjoint items in one query with no
+  extra coordination service (an advisory lock needs a separate key scheme and
+  still serialises contenders). Or drop the cron entirely for the queue above.
 
 **Observability.**
 
@@ -324,8 +328,10 @@ spine these build on.
 **Frontend & edge.**
 
 - Serve Next.js from a **CDN** with edge caching for static/ISR content.
-- Switch the heavy lists to **cursor-based pagination** (offset pagination
-  degrades on large tables) and add cache headers.
+- Switch the heavy lists to **cursor-based pagination** — offset pagination scans
+  and discards every skipped row (so deep pages get linearly slower, and rows can
+  shift under concurrent inserts), whereas a keyset cursor stays index-fast. Add
+  cache headers.
 - Adopt **React Query/SWR** for shared cache + background revalidation once the
   data surface justifies it.
 
