@@ -18,6 +18,27 @@ class ListAnalysisDto {
 
   @ApiProperty({ example: 'high' })
   priority!: string;
+
+  @ApiProperty({ nullable: true })
+  summary!: string | null;
+
+  @ApiProperty({ example: 0.92 })
+  confidence!: number;
+
+  @ApiProperty({ type: [String] })
+  keyThemes!: string[];
+
+  @ApiProperty({ type: [String] })
+  recommendedActions!: string[];
+
+  @ApiProperty({ example: 'gpt-4o-mini' })
+  modelUsed!: string;
+
+  @ApiProperty({ example: 1 })
+  version!: number;
+
+  @ApiProperty()
+  analyzedAt!: Date;
 }
 
 export class FeedbackListItemDto {
@@ -100,7 +121,17 @@ function toItem(row: FeedbackWithRelations): FeedbackListItemDto {
         }
       : null,
     latestAnalysis: latest
-      ? { sentiment: latest.sentiment, priority: latest.priority }
+      ? {
+          sentiment: latest.sentiment,
+          priority: latest.priority,
+          summary: latest.summary,
+          confidence: Number(latest.confidence),
+          keyThemes: latest.keyThemes,
+          recommendedActions: latest.recommendedActions,
+          modelUsed: latest.modelUsed,
+          version: latest.version,
+          analyzedAt: latest.analyzedAt,
+        }
       : null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

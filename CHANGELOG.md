@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `GET /api/v1/feedback` now supports `sentiment`, `priority`, and `analyzed` filters, and each
+  item's `latestAnalysis` includes the full detail (summary, confidence, keyThemes,
+  recommendedActions, modelUsed, version, analyzedAt) so the UI can show it without an extra fetch.
+
 ### Added
 
 - **Job monitoring**: a `JobRun` table (committed migration) records every backlog-screener run

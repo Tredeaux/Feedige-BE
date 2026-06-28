@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type, type TransformFnParams } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -17,11 +18,17 @@ export const FEEDBACK_STATUSES = [
   'archived',
 ] as const;
 
+export const FEEDBACK_SENTIMENTS = ['positive', 'neutral', 'negative'] as const;
+export const FEEDBACK_PRIORITIES = ['low', 'medium', 'high'] as const;
+
 export const FEEDBACK_SORT_FIELDS = [
   'createdAt',
   'updatedAt',
   'status',
 ] as const;
+
+const toBool = ({ value }: TransformFnParams): unknown =>
+  value === 'true' ? true : value === 'false' ? false : value;
 
 const trim = ({ value }: TransformFnParams): unknown =>
   typeof value === 'string' ? value.trim() : value;
@@ -55,6 +62,30 @@ export class ListFeedbackQueryDto {
   @IsString()
   @MaxLength(50)
   source?: string;
+
+  @ApiPropertyOptional({
+    enum: FEEDBACK_SENTIMENTS,
+    description: 'Filter by latest analysis sentiment',
+  })
+  @IsOptional()
+  @IsIn(FEEDBACK_SENTIMENTS)
+  sentiment?: string;
+
+  @ApiPropertyOptional({
+    enum: FEEDBACK_PRIORITIES,
+    description: 'Filter by latest analysis priority',
+  })
+  @IsOptional()
+  @IsIn(FEEDBACK_PRIORITIES)
+  priority?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by whether the item has been analyzed',
+  })
+  @IsOptional()
+  @Transform(toBool)
+  @IsBoolean()
+  analyzed?: boolean;
 
   @ApiPropertyOptional({ description: 'Search feedback text and submitter' })
   @IsOptional()

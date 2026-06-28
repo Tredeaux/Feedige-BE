@@ -151,10 +151,28 @@ export class FeedbackService {
   /** Paginated, filtered, searchable, sortable list for the triage view. */
   async list(query: ListFeedbackQueryDto): Promise<PaginatedFeedbackDto> {
     const { page, pageSize, status, source, search, sortBy, sortOrder } = query;
+    const { sentiment, priority, analyzed } = query;
+
+    // Sentiment/priority match any analysis version (fine for the common
+    // single-version case; a denormalized latest_* column would make it exact).
+    let analyses: Prisma.FeedbackWhereInput['analyses'];
+    if (sentiment || priority) {
+      analyses = {
+        some: {
+          ...(sentiment ? { sentiment } : {}),
+          ...(priority ? { priority } : {}),
+        },
+      };
+    } else if (analyzed === true) {
+      analyses = { some: {} };
+    } else if (analyzed === false) {
+      analyses = { none: {} };
+    }
 
     const where: Prisma.FeedbackWhereInput = {
       ...(status ? { status } : {}),
       ...(source ? { source } : {}),
+      ...(analyses ? { analyses } : {}),
       ...(search
         ? {
             OR: [
