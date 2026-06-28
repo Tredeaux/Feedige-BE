@@ -125,14 +125,14 @@ guaranteed — it isn't.
 
 **2. Synchronous manual analyse + a background cron, not a full job queue.**
 Triagers can analyse on demand (synchronous, immediate feedback in the UI), and
-a once-a-minute cron drains the backlog automatically. _Rejected:_ a real queue
-
-- worker (BullMQ/SQS). That's the correct end-state at volume — retries, backoff,
-  horizontal workers, no request-path latency — but it's operationally heavy for
-  this scope. The cron is a deliberate stepping-stone: ingestion is already
-  decoupled, so swapping the cron for a queue is a contained change, not a rewrite.
-  The queue wins the moment analysis volume or latency makes the minute-cadence or
-  the synchronous path unacceptable (see _Production risk_ and _What's next_).
+a once-a-minute cron drains the backlog automatically. _Rejected:_ a real job
+queue with dedicated workers (BullMQ/SQS). That's the correct end-state at volume
+— retries, backoff, horizontal workers, no request-path latency — but it's
+operationally heavy for this scope. The cron is a deliberate stepping-stone:
+ingestion is already decoupled, so swapping the cron for a queue is a contained
+change, not a rewrite. The queue wins the moment analysis volume or latency makes
+the minute-cadence or the synchronous path unacceptable (see _Production risk_
+and _What's next_).
 
 **3. OpenAI Structured Outputs + server-side re-validation, not prompt-and-parse.**
 The model is constrained to a strict JSON schema, and I **still** re-validate the

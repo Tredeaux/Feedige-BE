@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `SOLUTION.md` — the take-home write-up: architecture + diagram, key decisions and rejected
+  alternatives, how AI was used (with pushback), and the most significant production risk
+  (prompt injection) with its exact code location and remediation.
 - **Job monitoring**: a `JobRun` table (committed migration) records every backlog-screener run
   (success / noop / failed) with timestamps, duration, items processed, and errors. New
   admin/triage endpoints `GET /api/v1/jobs` (live summary: health, schedule, next run via
