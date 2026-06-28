@@ -9,12 +9,18 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiNotFoundResponse,
   ApiOperation,
+  ApiServiceUnavailableResponse,
   ApiTags,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { ApiAuthErrors } from '../common/api-auth-errors.decorator';
+import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { ROLES } from '../auth/roles';
@@ -37,6 +43,20 @@ export class AnalysisController {
     summary: 'Run AI analysis on a feedback item (triage/admin)',
   })
   @ApiCreatedResponse({ type: AnalysisResponseDto })
+  @ApiAuthErrors()
+  @ApiBadRequestResponse({ description: 'Invalid id', type: ErrorResponseDto })
+  @ApiNotFoundResponse({
+    description: 'Feedback not found',
+    type: ErrorResponseDto,
+  })
+  @ApiUnprocessableEntityResponse({
+    description: 'The AI returned output that failed validation',
+    type: ErrorResponseDto,
+  })
+  @ApiServiceUnavailableResponse({
+    description: 'AI analysis is not configured (no OPENAI_API_KEY)',
+    type: ErrorResponseDto,
+  })
   analyze(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request,

@@ -1,5 +1,10 @@
 import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { PrismaHealthIndicator } from './prisma.health';
 
@@ -13,6 +18,9 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @ApiOperation({ summary: 'Liveness/readiness check (includes a DB ping)' })
+  @ApiOkResponse({ description: 'All checks passed' })
+  @ApiServiceUnavailableResponse({ description: 'One or more checks failed' })
   check() {
     return this.health.check([() => this.prismaHealth.isHealthy('database')]);
   }

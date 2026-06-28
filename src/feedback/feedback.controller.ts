@@ -13,13 +13,17 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { ApiAuthErrors } from '../common/api-auth-errors.decorator';
+import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { ROLES } from '../auth/roles';
@@ -42,6 +46,10 @@ export class FeedbackController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Submit a piece of product feedback' })
   @ApiCreatedResponse({ type: FeedbackResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Validation failed',
+    type: ErrorResponseDto,
+  })
   create(@Body() dto: CreateFeedbackDto): Promise<FeedbackResponseDto> {
     return this.feedbackService.create(dto);
   }
@@ -52,6 +60,7 @@ export class FeedbackController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Aggregate analytics for the dashboard' })
   @ApiOkResponse({ type: FeedbackStatsDto })
+  @ApiAuthErrors()
   stats(): Promise<FeedbackStatsDto> {
     return this.feedbackService.getStats();
   }
@@ -62,6 +71,7 @@ export class FeedbackController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List feedback for triage (paginated)' })
   @ApiOkResponse({ type: PaginatedFeedbackDto })
+  @ApiAuthErrors()
   list(@Query() query: ListFeedbackQueryDto): Promise<PaginatedFeedbackDto> {
     return this.feedbackService.list(query);
   }
@@ -72,6 +82,15 @@ export class FeedbackController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Change a feedback item’s triage status' })
   @ApiOkResponse({ type: FeedbackResponseDto })
+  @ApiAuthErrors()
+  @ApiNotFoundResponse({
+    description: 'Feedback not found',
+    type: ErrorResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid id or status',
+    type: ErrorResponseDto,
+  })
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateFeedbackStatusDto,

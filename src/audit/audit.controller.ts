@@ -5,6 +5,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { ApiAuthErrors } from '../common/api-auth-errors.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ROLES } from '../auth/roles';
 import { Roles } from '../auth/roles.decorator';
@@ -15,6 +16,7 @@ import { ListAuditQueryDto } from './dto/list-audit.query.dto';
 
 @ApiTags('audit')
 @ApiBearerAuth()
+@ApiAuthErrors()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(ROLES.ADMIN, ROLES.TRIAGE)
 @Controller({ path: 'audit-logs', version: '1' })

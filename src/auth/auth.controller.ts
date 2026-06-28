@@ -9,14 +9,19 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
+import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { AuthService } from './auth.service';
 import { AuthResponseDto, AuthUserDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
@@ -35,6 +40,18 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create an account and return a JWT' })
   @ApiCreatedResponse({ type: AuthResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Validation failed',
+    type: ErrorResponseDto,
+  })
+  @ApiConflictResponse({
+    description: 'Email already registered',
+    type: ErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'Rate limit exceeded (5/min)',
+    type: ErrorResponseDto,
+  })
   register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
     return this.authService.register(dto);
   }
@@ -44,6 +61,14 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sign in and return a JWT' })
   @ApiOkResponse({ type: AuthResponseDto })
+  @ApiUnauthorizedResponse({
+    description: 'Invalid credentials',
+    type: ErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'Rate limit exceeded (5/min)',
+    type: ErrorResponseDto,
+  })
   login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(dto);
   }
@@ -53,6 +78,10 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get the currently authenticated user' })
   @ApiOkResponse({ type: AuthUserDto })
+  @ApiUnauthorizedResponse({
+    description: 'Missing or invalid bearer token',
+    type: ErrorResponseDto,
+  })
   me(@Req() req: Request): Promise<AuthUserDto> {
     const user = req.user as AuthenticatedUser;
     return this.authService.me(user.userId);

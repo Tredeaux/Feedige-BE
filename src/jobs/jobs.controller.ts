@@ -5,6 +5,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { ApiAuthErrors } from '../common/api-auth-errors.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ROLES } from '../auth/roles';
 import { Roles } from '../auth/roles.decorator';
@@ -16,6 +17,7 @@ import { JobsService } from './jobs.service';
 
 @ApiTags('jobs')
 @ApiBearerAuth()
+@ApiAuthErrors()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(ROLES.ADMIN, ROLES.TRIAGE)
 @Controller({ path: 'jobs', version: '1' })

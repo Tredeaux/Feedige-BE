@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GET /api/v1/feedback` now supports `sentiment`, `priority`, and `analyzed` filters, and each
   item's `latestAnalysis` includes the full detail (summary, confidence, keyThemes,
   recommendedActions, modelUsed, version, analyzedAt) so the UI can show it without an extra fetch.
+- Swagger/OpenAPI docs cleaned up and completed: richer API description, per-tag descriptions,
+  persisted authorization in the UI, and **documented error responses** (401/403/404/409/422/429/503)
+  on every endpoint via a shared `ErrorResponseDto` and an `@ApiAuthErrors()` decorator — so
+  `/api/docs` now reflects the real success _and_ failure shapes for all routes.
 
 ### Added
 
