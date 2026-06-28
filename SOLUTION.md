@@ -270,23 +270,91 @@ not an enforced boundary.
 
 ---
 
-## 7. What I deliberately scoped out (and would do next)
+## 7. Scaling to production (under load)
 
-Time-boxed work means explicit cuts. In rough priority order:
+The current design is sized for a single instance and modest traffic. Here's
+what I'd change as load grows, by tier — each is _the bottleneck I'd hit → the
+upgrade_. The architecture was chosen so these are **incremental swaps, not a
+rewrite**: ingestion is already decoupled from analysis, the API is already
+stateless, and the data model already has the indexes and the audit/observability
+spine these build on.
 
-- **Async analysis queue** (BullMQ/SQS) replacing the cron + synchronous path —
-  retries, backoff, horizontal workers, no request-path latency.
-- **Harden prompt-injection** per §6 (decouple model output from trust-sensitive
-  escalation).
-- **Distributed lock** for the backlog claim, for multi-replica safety.
-- **`job_run` retention** + basic metrics/tracing (OpenTelemetry) beyond logs.
-- **Broader automated coverage** — I prioritised unit tests on the riskiest logic
-  and end-to-end verification of the real app over exhaustive coverage.
-- **Shared API types** if/when the two repos' contract starts to drift.
+**Ingestion & AI throughput — the real bottleneck.**
+
+- The LLM call is the slow, rate-limited, costly dependency. Replace the
+  once-a-minute cron + synchronous analyse with a **job queue (BullMQ/Redis or
+  SQS) and a horizontally-scaled worker pool** — throughput then scales with
+  workers instead of one-item-per-minute, and submit stays instant.
+- **Backpressure against provider limits:** a token-bucket rate limiter, bounded
+  worker concurrency, exponential backoff + jitter on 429/5xx, and a
+  dead-letter queue for poison items.
+- **Cost & latency:** cache/deduplicate analyses of near-identical text; use a
+  cheaper model for first-pass triage and escalate only borderline items; track
+  per-request token cost as a first-class metric.
+
+**Data layer.**
+
+- **Connection pooling** (PgBouncer) — Prisma across many instances exhausts
+  Postgres connections quickly.
+- **Read/write split:** the dashboard and list endpoints are read-heavy; route
+  them to **read replicas**, keep writes on primary.
+- **Retention / partitioning** for the append-only high-volume tables
+  (`audit_log`, `job_run`): time-based partitions + a retention job, or ship them
+  to a log/warehouse sink. (Hot-path indexes are already in place.)
+- **Cache dashboard aggregates** (Redis, short TTL) or maintain incremental
+  rollups instead of recomputing the `GROUP BY`s on every view.
+
+**API tier.**
+
+- It's **stateless (JWT, no server sessions)**, so it scales horizontally behind
+  a load balancer as-is.
+- Move **rate limiting to a shared Redis store** so limits hold across instances
+  (the code already flags the in-memory store as single-instance).
+- Replace the cron's in-memory re-entrancy guard with a **distributed lock /
+  `SELECT … FOR UPDATE SKIP LOCKED`** — or drop the cron entirely in favour of the
+  queue above.
+
+**Observability.**
+
+- Logs are already structured (pino). Add **metrics + tracing (OpenTelemetry)** —
+  request p95, queue depth, analysis duration/failure rate, OpenAI cost/tokens —
+  with **dashboards and alerting** (backlog depth, error rate, latency, cost
+  spikes). The `/api/health` check and the job monitor are the seed of this.
+
+**Frontend & edge.**
+
+- Serve Next.js from a **CDN** with edge caching for static/ISR content.
+- Switch the heavy lists to **cursor-based pagination** (offset pagination
+  degrades on large tables) and add cache headers.
+- Adopt **React Query/SWR** for shared cache + background revalidation once the
+  data surface justifies it.
+
+**Resilience & correctness.**
+
+- **Idempotency keys** on submission to dedupe client retries.
+- A **circuit breaker** around OpenAI so a provider outage fails fast instead of
+  saturating the worker pool.
+- **Multi-AZ Postgres** with automated failover and point-in-time backups.
 
 ---
 
-## 8. Testing & verification
+## 8. What I deliberately scoped out (and would do next)
+
+Time-boxed work means explicit cuts. The scale items above are deferred by
+design; the remaining near-term ones:
+
+- **Harden prompt-injection** per §6 (decouple the model's output from
+  trust-sensitive escalation) — the highest-value follow-up.
+- **`job_run` retention** + the metrics/tracing from §7.
+- **Broader automated coverage** — I prioritised unit tests on the riskiest logic
+  and end-to-end verification of the real app over exhaustive coverage.
+- **Shared API types** if/when the two repos' contract starts to drift.
+- **Production admin provisioning** (an invite/promote flow) instead of a seeded
+  dev admin.
+
+---
+
+## 9. Testing & verification
 
 - **Backend:** unit tests on the riskiest logic (analysis output validation, the
   backlog screener, role guard, job summary/health) and **e2e** tests that boot
@@ -301,7 +369,7 @@ Time-boxed work means explicit cuts. In rough priority order:
 
 ---
 
-## 9. Running it
+## 10. Running it
 
 See the READMEs — [Feedige-BE/README.md](README.md) and
 [Feedige-FE/README.md](https://github.com/Tredeaux/Feedige-FE#readme). In short:
